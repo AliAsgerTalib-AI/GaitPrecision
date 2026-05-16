@@ -38,9 +38,9 @@ export default function Hero({ onStartAnalysis, onUploadComplete }: HeroProps) {
   };
 
   return (
-    <div className="pt-24 min-h-screen">
+    <div className="pt-20 sm:pt-24 min-h-screen">
       {/* Hero Content */}
-      <section className="max-w-[1440px] mx-auto px-6 py-10 flex flex-col items-center text-center">
+      <section className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col items-center text-center">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -49,20 +49,20 @@ export default function Hero({ onStartAnalysis, onUploadComplete }: HeroProps) {
           <span className="font-mono text-[10px] text-primary tracking-widest">V2.4.0 WASM ENGINE ACTIVE</span>
         </motion.div>
         
-        <motion.h1 
+        <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="font-display text-5xl md:text-6xl text-on-surface max-w-4xl mb-6 leading-[1.1] tracking-tight"
+          className="font-display text-4xl sm:text-5xl md:text-6xl text-on-surface max-w-4xl mb-4 sm:mb-6 leading-[1.1] tracking-tight"
         >
           Clinical Gait Analysis. <span className="text-primary italic">100% On-Device.</span>
         </motion.h1>
-        
-        <motion.p 
+
+        <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="font-sans text-xl text-on-surface-variant max-w-2xl mb-12"
+          className="font-sans text-base sm:text-xl text-on-surface-variant max-w-2xl mb-8 sm:mb-12"
         >
           Secure, real-time biomechanical assessment powered by MediaPipe and WebAssembly. No biometric data ever leaves your hardware.
         </motion.p>
@@ -98,17 +98,21 @@ export default function Hero({ onStartAnalysis, onUploadComplete }: HeroProps) {
               <div className="w-20 h-20 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center mb-6 group-hover:scale-110 group-hover:border-primary/40 transition-all shadow-lg">
                 <Upload className="w-10 h-10 text-primary" />
               </div>
-              <h3 className="text-2xl font-display font-semibold mb-2 group-hover:text-primary transition-colors">Record or Drop Video</h3>
+              <h3 className="text-xl sm:text-2xl font-display font-semibold mb-2 group-hover:text-primary transition-colors">
+                <span className="sm:hidden">Tap to Record</span>
+                <span className="hidden sm:inline">Record or Drop Video</span>
+              </h3>
               <p className="font-mono text-xs text-on-surface-variant mb-6 uppercase tracking-widest">Supports .MP4, .MOV, .AVI (Max 500MB)</p>
-              
-              <button 
+
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   fileInputRef.current?.click();
                 }}
                 className="px-6 py-2 bg-surface-container-highest border border-outline-variant rounded-lg font-mono text-[10px] text-on-surface hover:text-primary hover:border-primary/50 transition-all uppercase tracking-widest font-bold"
               >
-                Choose Local File
+                <span className="sm:hidden">Choose from Gallery</span>
+                <span className="hidden sm:inline">Choose Local File</span>
               </button>
             </div>
 

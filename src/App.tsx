@@ -6,11 +6,17 @@ import Report from './components/Report';
 import Profile from './components/Profile';
 import SymmetryComparison from './components/SymmetryComparison';
 import Recorder from './components/Recorder';
+import HowToRecord from './components/HowToRecord';
+import WellnessHome from './components/WellnessHome';
+import WellnessDashboard from './components/WellnessDashboard';
+import WellnessReport from './components/WellnessReport';
+import { ModeProvider, useMode } from './lib/modeContext';
 import { motion, AnimatePresence } from 'motion/react';
 
-type View = 'home' | 'dashboard' | 'report' | 'recording' | 'profile';
+type View = 'home' | 'dashboard' | 'report' | 'recording' | 'profile' | 'help';
 
-export default function App() {
+function AppInner() {
+  const { mode } = useMode();
   const [currentView, setCurrentView] = useState<View>('home');
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const prevVideoSrc = useRef<string | null>(null);
@@ -29,13 +35,16 @@ export default function App() {
   const renderView = useMemo(() => {
     switch (currentView) {
       case 'home':
-        return (
+        return mode === 'wellness' ? (
+          <WellnessHome
+            onStartRecording={() => setCurrentView('recording')}
+            onUploadComplete={(file) => { setVideo(file); setCurrentView('dashboard'); }}
+            onHowToRecord={() => setCurrentView('help')}
+          />
+        ) : (
           <Hero
             onStartAnalysis={() => setCurrentView('recording')}
-            onUploadComplete={(file) => {
-              setVideo(file);
-              setCurrentView('dashboard');
-            }}
+            onUploadComplete={(file) => { setVideo(file); setCurrentView('dashboard'); }}
           />
         );
       case 'recording':
@@ -49,9 +58,13 @@ export default function App() {
           />
         );
       case 'dashboard':
-        return <Dashboard videoSrc={videoSrc} />;
+        return mode === 'wellness'
+          ? <WellnessDashboard videoSrc={videoSrc} />
+          : <Dashboard videoSrc={videoSrc} />;
       case 'report':
-        return (
+        return mode === 'wellness' ? (
+          <WellnessReport />
+        ) : (
           <>
             <Report onViewProfile={() => setCurrentView('profile')} />
             <SymmetryComparison />
@@ -59,11 +72,13 @@ export default function App() {
         );
       case 'profile':
         return <Profile />;
+      case 'help':
+        return <HowToRecord />;
     }
   }, [currentView, videoSrc, setVideo]);
 
   return (
-    <div className="min-h-screen bg-surface selection:bg-primary/20 selection:text-primary">
+    <div className="min-h-screen bg-surface selection:bg-primary/20 selection:text-primary pb-16 md:pb-0">
       <Navigation currentView={currentView} onNavigate={setCurrentView} />
       
       <main className="relative">
@@ -88,6 +103,14 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ModeProvider>
+      <AppInner />
+    </ModeProvider>
   );
 }
 

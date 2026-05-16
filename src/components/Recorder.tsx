@@ -131,7 +131,7 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
   return (
     <div className="fixed inset-0 z-[60] bg-surface flex flex-col">
       {/* Top Header */}
-      <div className="h-20 bg-surface-container/80 backdrop-blur-md border-b border-outline-variant flex items-center justify-between px-8">
+      <div className="bg-surface-container/80 backdrop-blur-md border-b border-outline-variant flex items-center justify-between px-4 sm:px-8 h-16 sm:h-20" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center">
             <Video className="w-5 h-5 text-primary" />
@@ -199,12 +199,12 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
             />
             
             {/* HUD Overlay */}
-            <div className="absolute inset-0 pointer-events-none p-12 flex flex-col justify-between">
+            <div className="absolute inset-0 pointer-events-none p-4 sm:p-12 flex flex-col justify-between">
               {/* Corner Accents */}
-              <div className="absolute top-8 left-8 w-12 h-12 border-t-2 border-l-2 border-primary/40 rounded-tl-xl" />
-              <div className="absolute top-8 right-8 w-12 h-12 border-t-2 border-r-2 border-primary/40 rounded-tr-xl" />
-              <div className="absolute bottom-8 left-8 w-12 h-12 border-b-2 border-l-2 border-primary/40 rounded-bl-xl" />
-              <div className="absolute bottom-8 right-8 w-12 h-12 border-b-2 border-r-2 border-primary/40 rounded-br-xl" />
+              <div className="absolute top-4 left-4 sm:top-8 sm:left-8 w-8 h-8 sm:w-12 sm:h-12 border-t-2 border-l-2 border-primary/40 rounded-tl-xl" />
+              <div className="absolute top-4 right-4 sm:top-8 sm:right-8 w-8 h-8 sm:w-12 sm:h-12 border-t-2 border-r-2 border-primary/40 rounded-tr-xl" />
+              <div className="absolute bottom-4 left-4 sm:bottom-8 sm:left-8 w-8 h-8 sm:w-12 sm:h-12 border-b-2 border-l-2 border-primary/40 rounded-bl-xl" />
+              <div className="absolute bottom-4 right-4 sm:bottom-8 sm:right-8 w-8 h-8 sm:w-12 sm:h-12 border-b-2 border-r-2 border-primary/40 rounded-br-xl" />
 
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
@@ -259,7 +259,7 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
       </div>
 
       {/* Control Bar */}
-      <div className="h-32 bg-surface-container-low border-t border-outline-variant px-8 flex items-center justify-center gap-8 relative">
+      <div className="bg-surface-container-low border-t border-outline-variant px-4 sm:px-8 flex items-center justify-center gap-8 relative" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', minHeight: '8rem' }}>
         <AnimatePresence mode="wait">
           {!isRecording && !hasRecordedData ? (
             <motion.button

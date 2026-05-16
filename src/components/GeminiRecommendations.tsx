@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { GoogleGenAI } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 import { Zap, Activity, Footprints, CheckCircle2, Sparkles, AlertCircle, RefreshCcw } from 'lucide-react';
 import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
@@ -65,14 +64,9 @@ export default function GeminiRecommendations() {
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
-    const apiKey = process.env.GEMINI_API_KEY as string | undefined;
-    if (!apiKey) {
-      setError('GEMINI_API_KEY is not configured.');
-      setStatus('error');
-      return;
-    }
-
     let cancelled = false;
+    const abort = new AbortController();
+
     setStreamText('');
     setError('');
     setStatus('loading');
@@ -82,28 +76,36 @@ export default function GeminiRecommendations() {
       const session = sessions[0];
       if (!session) { if (!cancelled) setStatus('idle'); return; }
 
-      const ai = new GoogleGenAI({ apiKey });
-      const stream = await ai.models.generateContentStream({
-        model: 'gemini-2.0-flash',
-        contents: buildPrompt(session),
-        config: { maxOutputTokens: 600 },
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: buildPrompt(session) }),
+        signal: abort.signal,
       });
+
+      if (!response.ok) throw new Error(`Request failed (${response.status})`);
+      if (!response.body) throw new Error('No response body');
 
       if (!cancelled) setStatus('streaming');
 
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
       let acc = '';
-      for await (const chunk of stream) {
-        if (cancelled) return;
-        acc += chunk.text;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (cancelled) { reader.cancel(); return; }
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
         setStreamText(acc);
       }
 
       if (!cancelled) setStatus('done');
     })().catch(err => {
+      if (err.name === 'AbortError') return;
       if (!cancelled) { setError(err?.message ?? 'Request failed'); setStatus('error'); }
     });
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; abort.abort(); };
   }, [retryKey]);
 
   /* ── Error ── */

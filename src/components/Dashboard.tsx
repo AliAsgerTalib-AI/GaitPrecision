@@ -93,8 +93,8 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
 
   if (isLoading) {
     return (
-      <div className="pt-24 pb-12 px-6 max-w-[1440px] mx-auto min-h-screen">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="pt-20 sm:pt-24 pb-12 px-3 sm:px-6 max-w-[1440px] mx-auto min-h-screen">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
           <div className="lg:col-span-8 space-y-6">
             <div className="aspect-video bg-surface-container-low rounded-2xl border border-outline-variant animate-pulse flex flex-col items-center justify-center relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent -translate-x-full animate-shimmer" />
@@ -117,11 +117,11 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
   }
 
   return (
-    <div className="pt-24 pb-12 px-6 max-w-[1440px] mx-auto min-h-screen">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+    <div className="pt-20 sm:pt-24 pb-12 px-3 sm:px-6 max-w-[1440px] mx-auto min-h-screen">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+
         {/* Left Column: Analysis Player */}
-        <section className="lg:col-span-8 flex flex-col gap-6">
+        <section className="lg:col-span-8 flex flex-col gap-4 sm:gap-6">
           <div 
             ref={containerRef}
             className="relative aspect-video bg-surface-container-low rounded-2xl overflow-hidden border border-outline-variant group shadow-2xl"
@@ -292,7 +292,7 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
               </div>
             )}
 
-            <div className="grid grid-cols-5 mt-6 px-2 font-mono text-[10px] text-on-surface-variant uppercase tracking-[0.2em] font-bold">
+            <div className="hidden sm:grid grid-cols-5 mt-6 px-2 font-mono text-[10px] text-on-surface-variant uppercase tracking-[0.2em] font-bold">
               {['Contact', 'Mid-Stance', 'Terminal', 'Initial Swing', 'Terminal Swing'].map((ph, i) => (
                 <div key={i} className="flex flex-col gap-2">
                   <div className="w-1 h-1 bg-outline-variant rounded-full" />
