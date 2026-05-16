@@ -1,0 +1,6 @@
+{
+  "name": "GaitPrecision",
+  "description": "Clinical-grade biomechanical gait analysis with real-time on-device processing and 3D visualization.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": []
+}

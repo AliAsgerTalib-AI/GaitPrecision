@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Geist", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-surface: #0b1326;
+  --color-surface-dim: #0b1326;
+  --color-surface-bright: #31394d;
+  --color-surface-container-lowest: #060e20;
+  --color-surface-container-low: #131b2e;
+  --color-surface-container: #171f33;
+  --color-surface-container-high: #222a3d;
+  --color-surface-container-highest: #2d3449;
+  --color-on-surface: #dae2fd;
+  --color-on-surface-variant: #bacac5;
+  --color-inverse-surface: #dae2fd;
+  --color-inverse-on-surface: #283044;
+  --color-outline: #859490;
+  --color-outline-variant: #3c4a46;
+  --color-surface-tint: #3cddc7;
+  --color-primary: #57f1db;
+  --color-on-primary: #003731;
+  --color-primary-container: #2dd4bf;
+  --color-on-primary-container: #00574d;
+  --color-inverse-primary: #006b5f;
+  --color-secondary: #bcc7de;
+  --color-on-secondary: #263143;
+  --color-secondary-container: #3e495d;
+  --color-on-secondary-container: #aeb9d0;
+  --color-tertiary: #ffd1aa;
+  --color-on-tertiary: #4b2800;
+  --color-tertiary-container: #ffac5a;
+  --color-on-tertiary-container: #744000;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+  --color-primary-fixed: #62fae3;
+  --color-primary-fixed-dim: #3cddc7;
+  --color-on-primary-fixed: #00201c;
+  --color-on-primary-fixed-variant: #005047;
+  --color-secondary-fixed: #d8e3fb;
+  --color-secondary-fixed-dim: #bcc7de;
+  --color-on-secondary-fixed: #111c2d;
+  --color-on-secondary-fixed-variant: #3c475a;
+  --color-tertiary-fixed: #ffdcc0;
+  --color-tertiary-fixed-dim: #ffb875;
+  --color-on-tertiary-fixed: #2d1600;
+  --color-on-tertiary-fixed-variant: #6b3b00;
+
+  --animate-scan: scan 4s linear infinite;
+  --animate-dash: dash 3s ease-in-out infinite alternate;
+  --animate-shimmer: shimmer 2s linear infinite;
+
+  @keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+  }
+  @keyframes dash {
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-sans antialiased selection:bg-primary/30 selection:text-primary;
+  }
+}
+
+.dotted-pattern {
+  background-image: radial-gradient(circle, #1e293b 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.glass-panel {
+  @apply bg-surface-container/60 backdrop-blur-md border border-outline-variant;
+}
+
+.chart-grid {
+  background-image: linear-gradient(#1e293b 0.5px, transparent 0.5px), linear-gradient(90deg, #1e293b 0.5px, transparent 0.5px);
+  background-size: 40px 40px;
+}
+
