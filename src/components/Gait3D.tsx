@@ -6,6 +6,8 @@ import { Box, Layers } from 'lucide-react';
 import * as THREE from 'three';
 import { poseStore } from '@/src/lib/poseStore';
 
+const _camTarget = new THREE.Vector3(4, 2, 4);
+
 // Signed angle of segment p1→p2 measured from straight-down.
 // Returns 0 when p2 is directly below p1, positive = forward (right in image).
 function segDir(p1: { x: number; y: number }, p2: { x: number; y: number }): number {
@@ -182,7 +184,7 @@ function CinematicCamera() {
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     if (t < 2) {
-      state.camera.position.lerp(new THREE.Vector3(4, 2, 4), 0.05);
+      state.camera.position.lerp(_camTarget, 0.05);
       state.camera.lookAt(0, 1, 0);
     }
   });
@@ -195,7 +197,10 @@ export default function Gait3D() {
 
   // Poll the store every 300 ms to update the "LIVE" badge — cheap enough for UI only.
   useEffect(() => {
-    const id = setInterval(() => setIsLive(poseStore.read() !== null), 300);
+    const id = setInterval(() => {
+      const live = poseStore.read() !== null;
+      setIsLive(prev => prev === live ? prev : live);
+    }, 300);
     return () => clearInterval(id);
   }, []);
 

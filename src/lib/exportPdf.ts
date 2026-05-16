@@ -1,12 +1,7 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import type { GaitSession } from './sessionDb';
-
-function fmtDate(ts: number): string {
-  return new Date(ts).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  }).toUpperCase();
-}
+import { fmtDate } from './utils';
 
 function fmtDuration(secs: number): string {
   const m = Math.floor(secs / 60).toString().padStart(2, '0');

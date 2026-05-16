@@ -2,22 +2,10 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Share2, FileDown, Fingerprint, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '@/src/lib/utils';
+import { cn, fmtDate, fmtDuration } from '@/src/lib/utils';
 import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
 
 const Gait3D = lazy(() => import('./Gait3D'));
-
-function fmtDate(ts: number): string {
-  return new Date(ts).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  }).toUpperCase();
-}
-
-function fmtDuration(secs: number): string {
-  const m = Math.floor(secs / 60).toString().padStart(2, '0');
-  const s = (secs % 60).toString().padStart(2, '0');
-  return `${m}M ${s}S`;
-}
 
 // Resample an array to exactly n points (linear index interpolation).
 function sampleToN(arr: number[], n: number): (number | null)[] {
@@ -413,25 +401,19 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
           )}
         </div>
 
-        {/* Compare launch bar — appears once both sessions are picked */}
+        {/* Active compare indicator — comparison view renders automatically once both A and B are set */}
         <AnimatePresence>
           {compareMode && compareA && compareB && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="flex items-center justify-between p-5 bg-primary/5 border border-primary/30 rounded-2xl"
+              className="flex items-center p-5 bg-primary/5 border border-primary/30 rounded-2xl gap-3"
             >
-              <div className="font-mono text-[10px] text-primary uppercase tracking-widest font-bold flex items-center gap-3">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              <span className="font-mono text-[10px] text-primary uppercase tracking-widest font-bold">
                 {compareA.label} vs {compareB.label}
-              </div>
-              <button
-                onClick={() => {/* state already set, comparison view renders automatically */}}
-                className="px-5 py-2 bg-primary text-on-primary font-mono text-xs font-bold rounded-xl uppercase tracking-widest hover:opacity-90 transition-all"
-              >
-                View_Comparison →
-              </button>
+              </span>
             </motion.div>
           )}
         </AnimatePresence>

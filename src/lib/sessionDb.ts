@@ -24,17 +24,20 @@ export interface GaitSession {
   stride?: StrideMetrics;
 }
 
+import { mean } from './utils';
+
 const DB_NAME = 'gaitprecision';
 const STORE = 'sessions';
 const VERSION = 1;
 
+let _db: Promise<IDBDatabase> | null = null;
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
+  return (_db ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, VERSION);
     req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'id' });
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+    req.onerror = () => { _db = null; reject(req.error); };
+  }));
 }
 
 export async function saveSession(session: GaitSession): Promise<void> {
@@ -61,8 +64,7 @@ export async function loadSessions(): Promise<GaitSession[]> {
 export function scoreFromAngles(angles: { left: number[]; right: number[] }): number {
   if (!angles.left.length) return 0;
   const diffs = angles.left.map((l, i) => Math.abs(l - (angles.right[i] ?? l)));
-  const avg = diffs.reduce((a, b) => a + b, 0) / diffs.length;
-  return Math.round(Math.max(0, Math.min(100, 100 - avg * 2)));
+  return Math.round(Math.max(0, Math.min(100, 100 - mean(diffs) * 2)));
 }
 
 export function statusFromScore(score: number): GaitSession['status'] {

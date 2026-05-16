@@ -45,11 +45,16 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
     }
   }, [isReady, videoSrc, startAnalysis]);
 
-  // Persist the completed session to IndexedDB when the video reaches its natural end.
+  // Keep a stable ref to the latest angle/metric values so the save effect
+  // only needs to depend on isProcessing, not the per-frame state objects.
+  const latestRef = useRef({ kneeAngles, hipAngles, ankleAngles, strideMetrics });
+  latestRef.current = { kneeAngles, hipAngles, ankleAngles, strideMetrics };
+
   const wasProcessingRef = useRef(false);
   useEffect(() => {
     const justFinished = wasProcessingRef.current && !isProcessing;
     wasProcessingRef.current = isProcessing;
+    const { kneeAngles, hipAngles, ankleAngles, strideMetrics } = latestRef.current;
     if (!justFinished || !kneeAngles.left.length || !videoRef.current?.ended) return;
 
     const score = scoreFromAngles(kneeAngles);
@@ -67,7 +72,7 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
       stride: strideMetrics,
     };
     saveSession(session).catch(console.error);
-  }, [isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics]);
+  }, [isProcessing]);
 
   // Handle canvas sizing to match video aspect ratio
   useEffect(() => {

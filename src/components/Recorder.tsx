@@ -12,6 +12,7 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [hasRecordedData, setHasRecordedData] = useState(false);
@@ -31,6 +32,7 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
         },
         audio: false
       });
+      streamRef.current = mediaStream;
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -69,12 +71,8 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
     setupCamera();
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      if (timerRef.current) {
-        window.clearInterval(timerRef.current);
-      }
+      streamRef.current?.getTracks().forEach(track => track.stop());
+      if (timerRef.current) window.clearInterval(timerRef.current);
     };
   }, []);
 

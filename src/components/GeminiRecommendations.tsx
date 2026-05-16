@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import { motion, AnimatePresence } from 'motion/react';
 import { Zap, Activity, Footprints, CheckCircle2, Sparkles, AlertCircle, RefreshCcw } from 'lucide-react';
 import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
+import { mean } from '@/src/lib/utils';
 
 interface Rec {
   title: string;
@@ -15,7 +16,6 @@ const CARD_ICONS = [Zap, Activity, Footprints] as const;
 function buildPrompt(session: GaitSession): string {
   const L = session.kneeAngles.left;
   const R = session.kneeAngles.right;
-  const mean = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;
   const lMean = mean(L), rMean = mean(R);
   const asym = Math.abs(lMean - rMean).toFixed(1);
   const lROM = (Math.max(...L) - Math.min(...L)).toFixed(1);
@@ -138,10 +138,10 @@ export default function GeminiRecommendations() {
 
   /* ── Streaming / Done ── */
   const isDone = status === 'done';
+  const sections = streamText.split(/\n---\n?/);
   const completedRecs = parseRecs(streamText, isDone);
   const skeletonCount = Math.max(0, 3 - completedRecs.length);
-  // Live text of the section currently being written by Gemini
-  const activeStream = status === 'streaming' ? (streamText.split(/\n---\n?/).at(-1) ?? '') : '';
+  const activeStream = status === 'streaming' ? (sections.at(-1) ?? '') : '';
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">

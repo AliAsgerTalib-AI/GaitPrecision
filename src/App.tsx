@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import Navigation from './components/Navigation';
 import Hero from './components/Hero';
 import Dashboard from './components/Dashboard';
@@ -22,9 +22,9 @@ export default function App() {
     if (prev && prev !== videoSrc) URL.revokeObjectURL(prev);
   }, [videoSrc]);
 
-  const setVideo = (source: Blob | File) => {
+  const setVideo = useCallback((source: Blob | File) => {
     setVideoSrc(URL.createObjectURL(source));
-  };
+  }, []);
 
   const renderView = useMemo(() => {
     switch (currentView) {
@@ -59,16 +59,8 @@ export default function App() {
         );
       case 'profile':
         return <Profile />;
-      default:
-        return (
-          <Hero
-            onStartAnalysis={() => setCurrentView('recording')}
-            onUploadComplete={(file) => { setVideo(file); setCurrentView('dashboard'); }}
-          />
-        );
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentView, videoSrc]);
+  }, [currentView, videoSrc, setVideo]);
 
   return (
     <div className="min-h-screen bg-surface selection:bg-primary/20 selection:text-primary">

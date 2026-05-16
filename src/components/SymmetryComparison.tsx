@@ -3,6 +3,7 @@ import { Scale } from 'lucide-react';
 import { motion } from 'motion/react';
 import GeminiRecommendations from './GeminiRecommendations';
 import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
+import { mean } from '@/src/lib/utils';
 
 interface MetricRow {
   name: string;
@@ -12,9 +13,6 @@ interface MetricRow {
   type: 'primary' | 'error';
 }
 
-function mean(arr: number[]): number {
-  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
-}
 
 function variancePct(l: number, r: number): string {
   const avg = (l + r) / 2;
