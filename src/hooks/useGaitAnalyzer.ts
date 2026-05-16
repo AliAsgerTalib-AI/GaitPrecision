@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import type { NormalizedLandmark, PoseLandmarker } from '@mediapipe/tasks-vision';
+import { MEDIAPIPE_WASM_PATH, MEDIAPIPE_MODEL_PATH } from '@/src/lib/mediapipe-config';
 
 const SYNC_EVERY = 6;   // flush ref → state every 6th detected frame
 const HISTORY_CAP = 50; // max readings kept per side
@@ -38,20 +39,22 @@ export function useGaitAnalyzer() {
     let cancelled = false;
 
     async function initPose() {
+      // Hard SSR guard: window is undefined in Node/Next.js server runtime.
+      // The enclosing useEffect already prevents execution on the server, but
+      // this keeps the function safe if it is ever called outside that context.
+      if (typeof window === 'undefined') return;
+
       try {
         // Dynamic import defers WASM parsing until after first paint and keeps
         // this module safe to evaluate in SSR environments where browser globals
         // (navigator, Worker, WebAssembly) do not exist.
         const { PoseLandmarker, FilesetResolver, DrawingUtils } = await import('@mediapipe/tasks-vision');
 
-        const vision = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-        );
+        const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_PATH);
 
         const landmarker = await PoseLandmarker.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath:
-              'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+            modelAssetPath: MEDIAPIPE_MODEL_PATH,
             delegate: 'GPU',
           },
           runningMode: 'VIDEO',

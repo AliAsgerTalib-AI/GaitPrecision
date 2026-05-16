@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Share2, FileDown, Fingerprint, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio } from 'lucide-react';
 import { motion } from 'motion/react';
-import Gait3D from './Gait3D';
+
+// Lazy import keeps Three.js / WebGL code out of the server-side module graph.
+// The dynamic boundary means the chunk is only evaluated in a browser context.
+const Gait3D = lazy(() => import('./Gait3D'));
 
 const mockChartData = Array.from({ length: 40 }, (_, i) => ({
   time: i,
@@ -79,7 +82,9 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
             </div>
 
             <div className="glass-panel p-8 rounded-2xl">
-              <Gait3D />
+              <Suspense fallback={<div className="w-full aspect-video bg-surface-container-low rounded-2xl animate-pulse" />}>
+                <Gait3D />
+              </Suspense>
             </div>
           </div>
 
