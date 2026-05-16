@@ -1,14 +1,114 @@
-import { Scale, CheckCircle2, ChevronRight, Zap, Footprints, Activity } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Scale } from 'lucide-react';
 import { motion } from 'motion/react';
+import GeminiRecommendations from './GeminiRecommendations';
+import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
 
-const metrics = [
-  { name: 'Stance Time', left: '0.62s', right: '0.65s', variance: '4.1%', type: 'error' },
-  { name: 'Swing Time', left: '0.38s', right: '0.39s', variance: '0.8%', type: 'primary' },
-  { name: 'Peak Knee Flexion', left: '64.2°', right: '58.1°', variance: '11.4%', type: 'error' },
-  { name: 'Step Length', left: '72.4 cm', right: '74.1 cm', variance: '2.4%', type: 'primary' },
+interface MetricRow {
+  name: string;
+  left: string;
+  right: string;
+  variance: string;
+  type: 'primary' | 'error';
+}
+
+function mean(arr: number[]): number {
+  return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+}
+
+function variancePct(l: number, r: number): string {
+  const avg = (l + r) / 2;
+  return avg > 0 ? ((Math.abs(l - r) / avg) * 100).toFixed(1) + '%' : '—';
+}
+
+function buildMetrics(session: GaitSession): MetricRow[] {
+  const rows: MetricRow[] = [];
+
+  // Stance / Swing time from stride data
+  if (session.stride?.left && session.stride.right) {
+    const lStance = ((session.stride.left.stancePercent / 100) * session.stride.left.strideTime);
+    const rStance = ((session.stride.right.stancePercent / 100) * session.stride.right.strideTime);
+    const lSwing  = session.stride.left.strideTime  - lStance;
+    const rSwing  = session.stride.right.strideTime - rStance;
+    const stanceVar = variancePct(lStance, rStance);
+    const swingVar  = variancePct(lSwing, rSwing);
+    rows.push({
+      name: 'Stance Time',
+      left: `${lStance.toFixed(2)}s`, right: `${rStance.toFixed(2)}s`,
+      variance: stanceVar,
+      type: parseFloat(stanceVar) > 8 ? 'error' : 'primary',
+    });
+    rows.push({
+      name: 'Swing Time',
+      left: `${lSwing.toFixed(2)}s`, right: `${rSwing.toFixed(2)}s`,
+      variance: swingVar,
+      type: parseFloat(swingVar) > 8 ? 'error' : 'primary',
+    });
+  } else {
+    rows.push({ name: 'Stance Time', left: '—', right: '—', variance: '—', type: 'primary' });
+    rows.push({ name: 'Swing Time',  left: '—', right: '—', variance: '—', type: 'primary' });
+  }
+
+  // Peak knee flexion (max angle in buffer)
+  if (session.kneeAngles.left.length) {
+    const lPeak = Math.max(...session.kneeAngles.left);
+    const rPeak = Math.max(...session.kneeAngles.right.length ? session.kneeAngles.right : session.kneeAngles.left);
+    const kVar  = variancePct(lPeak, rPeak);
+    rows.push({
+      name: 'Peak Knee Flexion',
+      left: `${lPeak.toFixed(1)}°`, right: `${rPeak.toFixed(1)}°`,
+      variance: kVar,
+      type: parseFloat(kVar) > 8 ? 'error' : 'primary',
+    });
+  }
+
+  // Hip angle (mean)
+  if (session.hipAngles?.left.length) {
+    const lHip = mean(session.hipAngles.left);
+    const rHip = mean(session.hipAngles.right.length ? session.hipAngles.right : session.hipAngles.left);
+    const hVar = variancePct(lHip, rHip);
+    rows.push({
+      name: 'Hip Angle (mean)',
+      left: `${lHip.toFixed(1)}°`, right: `${rHip.toFixed(1)}°`,
+      variance: hVar,
+      type: parseFloat(hVar) > 8 ? 'error' : 'primary',
+    });
+  }
+
+  // Peak dorsiflexion (min ankle angle = max dorsiflexion)
+  if (session.ankleAngles?.left.length) {
+    const lDorsi = Math.min(...session.ankleAngles.left);
+    const rDorsi = Math.min(...session.ankleAngles.right.length ? session.ankleAngles.right : session.ankleAngles.left);
+    const aVar   = variancePct(lDorsi, rDorsi);
+    rows.push({
+      name: 'Peak Dorsiflexion',
+      left: `${lDorsi.toFixed(1)}°`, right: `${rDorsi.toFixed(1)}°`,
+      variance: aVar,
+      type: parseFloat(aVar) > 8 ? 'error' : 'primary',
+    });
+  }
+
+  return rows;
+}
+
+const FALLBACK_METRICS: MetricRow[] = [
+  { name: 'Stance Time',        left: '0.62s',   right: '0.65s',   variance: '4.1%',  type: 'error'   },
+  { name: 'Swing Time',         left: '0.38s',   right: '0.39s',   variance: '0.8%',  type: 'primary' },
+  { name: 'Peak Knee Flexion',  left: '64.2°',   right: '58.1°',   variance: '11.4%', type: 'error'   },
+  { name: 'Hip Angle (mean)',   left: '172.4°',  right: '173.8°',  variance: '0.8%',  type: 'primary' },
+  { name: 'Peak Dorsiflexion',  left: '112.4°',  right: '115.2°',  variance: '2.5%',  type: 'primary' },
 ];
 
 export default function SymmetryComparison() {
+  const [metrics, setMetrics] = useState<MetricRow[]>(FALLBACK_METRICS);
+
+  useEffect(() => {
+    loadSessions().then(sessions => {
+      const latest = sessions[0];
+      if (latest) setMetrics(buildMetrics(latest));
+    }).catch(console.error);
+  }, []);
+
   return (
     <div className="max-w-[1440px] mx-auto px-6 py-10 space-y-12">
       {/* Table Section */}
@@ -42,7 +142,13 @@ export default function SymmetryComparison() {
             </thead>
             <tbody className="font-mono text-xs">
               {metrics.map((row, idx) => (
-                <tr key={idx} className="hover:bg-surface-container-high/30 transition-colors border-b border-outline-variant/30 group">
+                <motion.tr
+                  key={idx}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="hover:bg-surface-container-high/30 transition-colors border-b border-outline-variant/30 group"
+                >
                   <td className="p-6 text-on-surface font-semibold group-hover:text-primary transition-colors">{row.name}</td>
                   <td className="p-6 text-primary font-bold italic">{row.left}</td>
                   <td className="p-6">
@@ -56,79 +162,23 @@ export default function SymmetryComparison() {
                     </div>
                   </td>
                   <td className="p-6 text-secondary font-bold text-right italic">{row.right}</td>
-                </tr>
+                </motion.tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
 
-      {/* Actionable Recommendations */}
+      {/* AI-Powered Recommendations */}
       <section className="space-y-8">
         <h2 className="text-2xl font-display font-bold text-on-surface flex items-center gap-3">
-          <CheckCircle2 className="w-6 h-6 text-primary" />
+          <Scale className="w-6 h-6 text-primary" />
           Clinical Action Plan
+          <span className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-md font-mono text-[9px] text-primary font-bold uppercase tracking-widest ml-2">
+            Gemini AI
+          </span>
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Card 1 */}
-          <motion.div whileHover={{ y: -5 }} className="bg-surface-container-low border border-outline-variant p-8 rounded-2xl flex flex-col group hover:border-primary/50 transition-all shadow-xl">
-            <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-8 text-primary group-hover:scale-110 group-hover:bg-primary group-hover:text-on-primary transition-all shadow-lg">
-              <Zap className="w-7 h-7" />
-            </div>
-            <h3 className="text-xl font-display font-bold mb-4">Mobility Drills</h3>
-            <p className="text-on-surface-variant mb-8 flex-grow leading-relaxed">Focus on sagittal plane mechanics. Asymmetric flexion suggests hamstring tension on right posterior chain.</p>
-            <div className="space-y-3 mb-10">
-              {['Dynamic Hip Opening (3x15)', 'Eccentric Hamstring Loading'].map((item, i) => (
-                <div key={i} className="flex items-center gap-3 text-xs font-mono font-bold text-on-surface group-hover:text-primary transition-colors">
-                  <CheckCircle2 className="w-4 h-4 text-primary" /> {item}
-                </div>
-              ))}
-            </div>
-            <button className="w-full py-4 bg-surface-container-high border border-outline-variant text-xs font-mono font-bold tracking-widest rounded-xl hover:bg-primary hover:text-on-primary transition-all flex items-center justify-center gap-2 group/btn shadow-md">
-              VIEW DEMO VIDEO <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-            </button>
-          </motion.div>
-
-          {/* Card 2 */}
-          <motion.div whileHover={{ y: -5 }} className="bg-surface-container-low border border-outline-variant p-8 rounded-2xl flex flex-col group hover:border-primary/50 transition-all shadow-xl">
-             <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-8 text-primary group-hover:scale-110 group-hover:bg-primary group-hover:text-on-primary transition-all shadow-lg">
-              <Activity className="w-7 h-7" />
-            </div>
-            <h3 className="text-xl font-display font-bold mb-4">Cadence Tuning</h3>
-            <p className="text-on-surface-variant mb-8 flex-grow leading-relaxed">Current 162 SPM is sub-optimal. Target 170-174 SPM to reduce ground reaction forces by 12%.</p>
-            <div className="bg-surface-container-lowest p-5 border border-outline-variant rounded-xl mb-10 shadow-inner">
-               <div className="flex justify-between items-end mb-3">
-                 <span className="font-mono text-[10px] text-on-surface-variant font-bold uppercase">Target Zone</span>
-                 <span className="font-mono text-[10px] text-primary font-bold">172 SPM</span>
-               </div>
-               <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                 <motion.div initial={{ width: 0 }} animate={{ width: '85%' }} className="h-full bg-primary shadow-[0_0_8px_#57f1db]" />
-               </div>
-            </div>
-            <button className="w-full py-4 bg-surface-container-high border border-outline-variant text-xs font-mono font-bold tracking-widest rounded-xl hover:bg-primary hover:text-on-primary transition-all flex items-center justify-center gap-2 group/btn shadow-md">
-              CONFIG METRONOME <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-            </button>
-          </motion.div>
-
-          {/* Card 3 */}
-          <motion.div whileHover={{ y: -5 }} className="bg-surface-container-low border border-outline-variant p-8 rounded-2xl flex flex-col group hover:border-primary/50 transition-all shadow-xl">
-             <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-8 text-primary group-hover:scale-110 group-hover:bg-primary group-hover:text-on-primary transition-all shadow-lg">
-              <Footprints className="w-7 h-7" />
-            </div>
-            <h3 className="text-xl font-display font-bold mb-4">Footwear Guidance</h3>
-            <p className="text-on-surface-variant mb-8 flex-grow leading-relaxed">Mid-stance pronation detected on left. Stability-oriented medical-grade orthotics recommended.</p>
-            <div className="flex flex-wrap gap-2 mb-10">
-              {['HIGH STABILITY', '6mm DROP', 'NEUTRAL HEEL'].map((tag, i) => (
-                <span key={i} className="px-2.5 py-1.5 bg-secondary-container/20 text-on-secondary-container border border-secondary-container/30 font-mono text-[9px] font-bold rounded-lg tracking-wider">
-                  {tag}
-                </span>
-              ))}
-            </div>
-            <button className="w-full py-4 bg-surface-container-high border border-outline-variant text-xs font-mono font-bold tracking-widest rounded-xl hover:bg-primary hover:text-on-primary transition-all flex items-center justify-center gap-2 group/btn shadow-md">
-              COMPARE GEAR <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-            </button>
-          </motion.div>
-        </div>
+        <GeminiRecommendations />
       </section>
 
        {/* Biometric Export CTA */}
@@ -137,8 +187,8 @@ export default function SymmetryComparison() {
           <h3 className="text-3xl font-display font-bold text-on-surface mb-3">Complete Biometric Export</h3>
           <p className="text-on-surface-variant text-lg">Generate high-fidelity DICOM-compliant reports for instant clinical integration.</p>
         </div>
-        
-        <motion.button 
+
+        <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           className="group relative flex items-center gap-4 bg-primary text-on-primary px-12 py-6 rounded-full font-display text-xl font-bold hover:brightness-110 transition-all shadow-2xl shadow-primary/20"
@@ -147,7 +197,7 @@ export default function SymmetryComparison() {
           <Scale className="w-6 h-6 relative z-10" />
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
         </motion.button>
-        
+
         <p className="mt-8 font-mono text-[10px] text-primary/60 uppercase tracking-[0.3em] flex items-center gap-3 font-bold">
           <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
           End-to-End Encrypted Handshake Active

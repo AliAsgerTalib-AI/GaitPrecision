@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Navigation from './components/Navigation';
 import Hero from './components/Hero';
 import Dashboard from './components/Dashboard';
@@ -12,31 +12,44 @@ type View = 'home' | 'dashboard' | 'report' | 'recording' | 'profile';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>('home');
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const prevVideoSrc = useRef<string | null>(null);
+
+  // Revoke the previous object URL when a new one replaces it.
+  useEffect(() => {
+    const prev = prevVideoSrc.current;
+    prevVideoSrc.current = videoSrc;
+    if (prev && prev !== videoSrc) URL.revokeObjectURL(prev);
+  }, [videoSrc]);
+
+  const setVideo = (source: Blob | File) => {
+    setVideoSrc(URL.createObjectURL(source));
+  };
 
   const renderView = useMemo(() => {
     switch (currentView) {
       case 'home':
         return (
-          <Hero 
-            onStartAnalysis={() => setCurrentView('recording')} 
+          <Hero
+            onStartAnalysis={() => setCurrentView('recording')}
             onUploadComplete={(file) => {
-              console.log('File uploaded:', file.name);
+              setVideo(file);
               setCurrentView('dashboard');
             }}
           />
         );
       case 'recording':
         return (
-          <Recorder 
+          <Recorder
             onComplete={(blob) => {
-              console.log('Video captured:', blob.size);
+              setVideo(blob);
               setCurrentView('dashboard');
-            }} 
-            onCancel={() => setCurrentView('home')} 
+            }}
+            onCancel={() => setCurrentView('home')}
           />
         );
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard videoSrc={videoSrc} />;
       case 'report':
         return (
           <>
@@ -48,13 +61,14 @@ export default function App() {
         return <Profile />;
       default:
         return (
-          <Hero 
-            onStartAnalysis={() => setCurrentView('recording')} 
-            onUploadComplete={() => setCurrentView('dashboard')}
+          <Hero
+            onStartAnalysis={() => setCurrentView('recording')}
+            onUploadComplete={(file) => { setVideo(file); setCurrentView('dashboard'); }}
           />
         );
     }
-  }, [currentView]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentView, videoSrc]);
 
   return (
     <div className="min-h-screen bg-surface selection:bg-primary/20 selection:text-primary">

@@ -11,9 +11,10 @@ interface RecorderProps {
 export default function Recorder({ onComplete, onCancel }: RecorderProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const [hasRecordedData, setHasRecordedData] = useState(false);
   const [error, setError] = useState<{ title: string; message: string; type: 'permission' | 'device' | 'hardware' | 'unknown' } | null>(null);
   const [duration, setDuration] = useState(0);
   const timerRef = useRef<number | null>(null);
@@ -79,28 +80,29 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
 
   const startRecording = () => {
     if (!stream) return;
-    
-    setRecordedChunks([]);
-    const mediaRecorder = new MediaRecorder(stream, {
-      mimeType: 'video/webm;codecs=vp9'
-    });
+
+    chunksRef.current = [];
+    setHasRecordedData(false);
+
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+      ? 'video/webm;codecs=vp9'
+      : 'video/webm';
+    const mediaRecorder = new MediaRecorder(stream, { mimeType });
 
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) {
-        setRecordedChunks(prev => [...prev, event.data]);
+        chunksRef.current.push(event.data);
       }
     };
 
     mediaRecorder.onstop = () => {
-      const blob = new Blob(recordedChunks, { type: 'video/webm' });
-      // In a real app, we'd wait for the final dataavailable event
+      setHasRecordedData(chunksRef.current.length > 0);
     };
 
     mediaRecorder.start();
     mediaRecorderRef.current = mediaRecorder;
     setIsRecording(true);
-    
-    // Start timer
+
     setDuration(0);
     timerRef.current = window.setInterval(() => {
       setDuration(prev => prev + 1);
@@ -118,7 +120,7 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
   };
 
   const finalizeRecording = () => {
-    const finalBlob = new Blob(recordedChunks, { type: 'video/webm' });
+    const finalBlob = new Blob(chunksRef.current, { type: 'video/webm' });
     onComplete(finalBlob);
   };
 
@@ -261,7 +263,7 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
       {/* Control Bar */}
       <div className="h-32 bg-surface-container-low border-t border-outline-variant px-8 flex items-center justify-center gap-8 relative">
         <AnimatePresence mode="wait">
-          {!isRecording && recordedChunks.length === 0 ? (
+          {!isRecording && !hasRecordedData ? (
             <motion.button
               key="start"
               initial={{ opacity: 0, scale: 0.9 }}
@@ -290,9 +292,10 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
               animate={{ opacity: 1, y: 0 }}
               className="flex items-center gap-6"
             >
-              <button 
+              <button
                 onClick={() => {
-                  setRecordedChunks([]);
+                  chunksRef.current = [];
+                  setHasRecordedData(false);
                   setDuration(0);
                 }}
                 className="flex flex-col items-center gap-2 group"

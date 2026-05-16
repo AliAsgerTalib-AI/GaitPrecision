@@ -1,12 +1,17 @@
-import { Play, SkipBack, SkipForward, Maximize2, Radio, Activity, Waves, Gauge, Plus, AlertCircle } from 'lucide-react';
+import { Play, SkipBack, SkipForward, Maximize2, Radio, Activity, Waves, Plus, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AnalysisSettings from './AnalysisSettings';
 import { useGaitAnalyzer } from '../hooks/useGaitAnalyzer';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/src/lib/utils';
+import { saveSession, scoreFromAngles, statusFromScore, labelFromScore, type GaitSession } from '@/src/lib/sessionDb';
 
-export default function Dashboard() {
-  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, startAnalysis } = useGaitAnalyzer();
+interface DashboardProps {
+  videoSrc?: string | null;
+}
+
+export default function Dashboard({ videoSrc }: DashboardProps) {
+  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis } = useGaitAnalyzer();
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -20,6 +25,49 @@ export default function Dashboard() {
   const currentLeftAngle = kneeAngles.left[kneeAngles.left.length - 1] || 142;
   const currentRightAngle = kneeAngles.right[kneeAngles.right.length - 1] || 138;
   const asymmetry = Math.abs(currentLeftAngle - currentRightAngle);
+
+  // Auto-start analysis when MediaPipe is ready and a video is loaded.
+  // A ref guards against re-starting the same src if other deps change.
+  const autoStartedSrcRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isReady || !videoSrc || autoStartedSrcRef.current === videoSrc) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    autoStartedSrcRef.current = videoSrc;
+    const go = () => startAnalysis();
+
+    if (video.readyState >= 3) { // HAVE_FUTURE_DATA — already buffered enough
+      go();
+    } else {
+      video.addEventListener('canplay', go, { once: true });
+      return () => video.removeEventListener('canplay', go);
+    }
+  }, [isReady, videoSrc, startAnalysis]);
+
+  // Persist the completed session to IndexedDB when the video reaches its natural end.
+  const wasProcessingRef = useRef(false);
+  useEffect(() => {
+    const justFinished = wasProcessingRef.current && !isProcessing;
+    wasProcessingRef.current = isProcessing;
+    if (!justFinished || !kneeAngles.left.length || !videoRef.current?.ended) return;
+
+    const score = scoreFromAngles(kneeAngles);
+    const session: GaitSession = {
+      id: `SES-${Date.now()}`,
+      date: Date.now(),
+      duration: Math.round(videoRef.current.duration),
+      label: labelFromScore(score),
+      kneeAngles,
+      hipAngles,
+      ankleAngles,
+      frameCount: kneeAngles.left.length,
+      score,
+      status: statusFromScore(score),
+      stride: strideMetrics,
+    };
+    saveSession(session).catch(console.error);
+  }, [isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics]);
 
   // Handle canvas sizing to match video aspect ratio
   useEffect(() => {
@@ -73,18 +121,29 @@ export default function Dashboard() {
             ref={containerRef}
             className="relative aspect-video bg-surface-container-low rounded-2xl overflow-hidden border border-outline-variant group shadow-2xl"
           >
-            {/* RAW VIDEO FEED (Hidden by low opacity during processing) */}
-            <video 
+            {/* RAW VIDEO FEED */}
+            <video
               ref={videoRef}
-              src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+              src={videoSrc ?? undefined}
               className={cn(
                 "absolute inset-0 w-full h-full object-cover transition-all duration-1000",
                 isProcessing ? "opacity-30 grayscale contrast-125" : "opacity-10"
               )}
               muted
               playsInline
-              loop
             />
+
+            {/* No-video placeholder */}
+            {!videoSrc && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-5">
+                <div className="w-16 h-16 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center">
+                  <Play className="w-7 h-7 text-on-surface-variant" />
+                </div>
+                <p className="font-mono text-[11px] text-on-surface-variant uppercase tracking-[0.25em]">
+                  No video loaded — record or upload a session
+                </p>
+              </div>
+            )}
 
             {/* HIGH-PRECISION SKELETAL OVERLAY */}
             <canvas 
@@ -139,9 +198,9 @@ export default function Dashboard() {
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-6">
                   <button className="text-on-surface hover:text-primary transition-colors"><SkipBack /></button>
-                  <button 
+                  <button
                     onClick={startAnalysis}
-                    disabled={!isReady || isProcessing}
+                    disabled={!isReady || isProcessing || !videoSrc}
                     className="w-16 h-16 bg-primary text-on-primary rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-surface-container-highest disabled:text-on-surface-variant disabled:shadow-none"
                   >
                     {!isReady || isProcessing ? (
@@ -179,19 +238,55 @@ export default function Dashboard() {
                 <h3 className="text-2xl font-display font-bold text-on-surface mb-2">Stride Cycle Segmentation</h3>
                 <p className="text-on-surface-variant text-sm max-w-md">Real-time temporal gait parameters including stance-swing ratios and limb synchronization.</p>
               </div>
-              <div className="font-mono text-[10px] flex gap-6 font-bold tracking-widest">
-                <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_#57f1db]"></span> STANCE</span>
-                <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary/20"></span> SWING</span>
+              <div className="flex items-center gap-8">
+                {strideMetrics.cadence > 0 && (
+                  <div className="text-right">
+                    <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-widest font-bold opacity-60">Cadence</p>
+                    <p className="font-mono text-xl font-bold text-primary tabular-nums">{strideMetrics.cadence}<span className="text-[10px] text-on-surface-variant ml-1">spm</span></p>
+                  </div>
+                )}
+                <div className="font-mono text-[10px] flex gap-6 font-bold tracking-widest">
+                  <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_#57f1db]"></span> STANCE</span>
+                  <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary/20"></span> SWING</span>
+                </div>
               </div>
             </div>
-            
-            <div className="h-20 w-full flex items-center gap-1 rounded-2xl overflow-hidden border border-outline-variant bg-surface-container-low p-1.5 shadow-inner">
-              <div className="h-full bg-primary/40 border-r border-primary/20 w-1/4 flex items-center justify-center font-mono text-[10px] font-bold text-primary rounded-l-xl">STANCE 62%</div>
-              <div className="h-full bg-primary/5 border-r border-primary/10 w-[15%] flex items-center justify-center font-mono text-[10px] font-bold opacity-60">SWING 38%</div>
-              <div className="h-full bg-primary/40 border-r border-primary/20 w-1/3 flex items-center justify-center font-mono text-[10px] font-bold text-primary">STANCE 61%</div>
-              <div className="h-full bg-primary/20 grow flex items-center justify-center font-mono text-[10px] font-bold italic opacity-60 rounded-r-xl">OPTIMIZING...</div>
-            </div>
-            
+
+            {strideMetrics.left.strideTime > 0 || strideMetrics.right.strideTime > 0 ? (
+              <div className="h-20 w-full flex items-center gap-1 rounded-2xl overflow-hidden border border-outline-variant bg-surface-container-low p-1.5 shadow-inner">
+                <div
+                  className="h-full bg-primary/40 border-r border-primary/20 flex items-center justify-center font-mono text-[10px] font-bold text-primary rounded-l-xl shrink-0"
+                  style={{ width: `${strideMetrics.left.stancePercent / 2}%` }}
+                >
+                  L STANCE {strideMetrics.left.stancePercent}%
+                </div>
+                <div
+                  className="h-full bg-primary/10 border-r border-primary/10 flex items-center justify-center font-mono text-[10px] font-bold text-primary/60 shrink-0"
+                  style={{ width: `${strideMetrics.left.swingPercent / 2}%` }}
+                >
+                  SWING {strideMetrics.left.swingPercent}%
+                </div>
+                <div
+                  className="h-full bg-secondary/40 border-r border-secondary/20 flex items-center justify-center font-mono text-[10px] font-bold text-secondary shrink-0"
+                  style={{ width: `${strideMetrics.right.stancePercent / 2}%` }}
+                >
+                  R STANCE {strideMetrics.right.stancePercent}%
+                </div>
+                <div className="h-full bg-secondary/10 grow flex items-center justify-center font-mono text-[10px] font-bold text-secondary/60 rounded-r-xl">
+                  SWING {strideMetrics.right.swingPercent}%
+                </div>
+              </div>
+            ) : (
+              <div className="h-20 w-full flex items-center gap-1 rounded-2xl overflow-hidden border border-outline-variant bg-surface-container-low p-1.5 shadow-inner">
+                <div className="h-full bg-primary/40 border-r border-primary/20 w-1/4 flex items-center justify-center font-mono text-[10px] font-bold text-primary rounded-l-xl">STANCE 62%</div>
+                <div className="h-full bg-primary/5 border-r border-primary/10 w-[15%] flex items-center justify-center font-mono text-[10px] font-bold opacity-60">SWING 38%</div>
+                <div className="h-full bg-primary/40 border-r border-primary/20 w-1/3 flex items-center justify-center font-mono text-[10px] font-bold text-primary">STANCE 61%</div>
+                <div className="h-full bg-primary/20 grow flex items-center justify-center font-mono text-[10px] font-bold italic opacity-60 rounded-r-xl">
+                  {isProcessing ? 'DETECTING...' : 'AWAITING DATA'}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-5 mt-6 px-2 font-mono text-[10px] text-on-surface-variant uppercase tracking-[0.2em] font-bold">
               {['Contact', 'Mid-Stance', 'Terminal', 'Initial Swing', 'Terminal Swing'].map((ph, i) => (
                 <div key={i} className="flex flex-col gap-2">

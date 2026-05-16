@@ -1,37 +1,265 @@
-import { useState, lazy, Suspense } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Share2, FileDown, Fingerprint, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/src/lib/utils';
+import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
 
-// Lazy import keeps Three.js / WebGL code out of the server-side module graph.
-// The dynamic boundary means the chunk is only evaluated in a browser context.
 const Gait3D = lazy(() => import('./Gait3D'));
 
-const mockChartData = Array.from({ length: 40 }, (_, i) => ({
-  time: i,
-  knee: 40 + Math.sin(i * 0.3) * 30 + Math.random() * 5,
-  ankle: 10 + Math.cos(i * 0.3) * 15 + Math.random() * 3,
-}));
+function fmtDate(ts: number): string {
+  return new Date(ts).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  }).toUpperCase();
+}
 
-const SESSIONS = [
-  { id: 'SES-001', date: 'OCT 24, 2026', type: 'Reflex Baseline Protocol', score: 94, duration: '04M 12S', status: 'Stable' },
-  { id: 'SES-002', date: 'OCT 12, 2026', type: 'Post-Op Kinematic Follow-up', score: 82, duration: '03M 45S', status: 'Improved' },
-  { id: 'SES-003', date: 'SEP 28, 2026', type: 'Stance Stability Analysis', score: 71, duration: '02M 30S', status: 'Critical' },
-];
+function fmtDuration(secs: number): string {
+  const m = Math.floor(secs / 60).toString().padStart(2, '0');
+  const s = (secs % 60).toString().padStart(2, '0');
+  return `${m}M ${s}S`;
+}
+
+// Resample an array to exactly n points (linear index interpolation).
+function sampleToN(arr: number[], n: number): (number | null)[] {
+  if (!arr.length) return Array(n).fill(null);
+  if (arr.length === 1) return Array(n).fill(arr[0]);
+  return Array.from({ length: n }, (_, i) => {
+    const idx = Math.round((i / (n - 1)) * (arr.length - 1));
+    return arr[idx];
+  });
+}
 
 export default function Report({ onViewProfile }: { onViewProfile: () => void }) {
-  const [selectedSession, setSelectedSession] = useState<typeof SESSIONS[0] | null>(null);
+  const [sessions, setSessions] = useState<GaitSession[]>([]);
+  const [selectedSession, setSelectedSession] = useState<GaitSession | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareA, setCompareA] = useState<GaitSession | null>(null);
+  const [compareB, setCompareB] = useState<GaitSession | null>(null);
 
-  if (selectedSession) {
+  useEffect(() => {
+    loadSessions().then(setSessions).catch(console.error);
+  }, []);
+
+  function toggleCompare() {
+    setCompareMode(m => !m);
+    setCompareA(null);
+    setCompareB(null);
+  }
+
+  function handleCompareClick(session: GaitSession) {
+    if (compareA?.id === session.id) {
+      // Deselect A — promote B into A slot
+      setCompareA(compareB);
+      setCompareB(null);
+    } else if (compareB?.id === session.id) {
+      setCompareB(null);
+    } else if (!compareA) {
+      setCompareA(session);
+    } else if (!compareB) {
+      setCompareB(session);
+    } else {
+      // Both slots taken — replace B with new pick
+      setCompareB(session);
+    }
+  }
+
+  // ── Comparison view ────────────────────────────────────────────────────
+  if (compareMode && compareA && compareB) {
+    const N = 100;
+    const chartData = Array.from({ length: N }, (_, i) => ({
+      pct: i,
+      aLeft:  sampleToN(compareA.kneeAngles.left,  N)[i],
+      aRight: sampleToN(compareA.kneeAngles.right, N)[i],
+      bLeft:  sampleToN(compareB.kneeAngles.left,  N)[i],
+      bRight: sampleToN(compareB.kneeAngles.right, N)[i],
+    }));
+
+    const diffRows = [
+      {
+        label: 'Symmetry Score',
+        a: `${compareA.score}`,
+        b: `${compareB.score}`,
+        delta: compareB.score - compareA.score,
+        unit: 'pts',
+      },
+      {
+        label: 'Duration',
+        a: fmtDuration(compareA.duration),
+        b: fmtDuration(compareB.duration),
+        delta: null as number | null,
+        unit: '',
+      },
+      {
+        label: 'Cadence',
+        a: compareA.stride?.cadence ? `${compareA.stride.cadence} spm` : '—',
+        b: compareB.stride?.cadence ? `${compareB.stride.cadence} spm` : '—',
+        delta: (compareA.stride?.cadence && compareB.stride?.cadence)
+          ? compareB.stride.cadence - compareA.stride.cadence
+          : null,
+        unit: 'spm',
+      },
+      {
+        label: 'L Stance %',
+        a: compareA.stride?.left ? `${compareA.stride.left.stancePercent}%` : '—',
+        b: compareB.stride?.left ? `${compareB.stride.left.stancePercent}%` : '—',
+        delta: (compareA.stride?.left && compareB.stride?.left)
+          ? compareB.stride.left.stancePercent - compareA.stride.left.stancePercent
+          : null,
+        unit: '%',
+      },
+      {
+        label: 'Frames Analyzed',
+        a: `${compareA.frameCount}`,
+        b: `${compareB.frameCount}`,
+        delta: compareB.frameCount - compareA.frameCount,
+        unit: '',
+      },
+    ];
+
     return (
       <div className="pt-24 pb-12 px-6 max-w-[1440px] mx-auto w-full space-y-8">
-        <motion.div 
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-between items-center bg-surface-container p-6 rounded-2xl border border-outline-variant shadow-xl"
+        >
+          <div>
+            <h2 className="text-2xl font-display font-bold text-on-surface flex items-center gap-3">
+              <TrendingUp className="w-6 h-6 text-primary" />
+              Session Comparison
+            </h2>
+            <p className="text-on-surface-variant font-mono text-[10px] uppercase tracking-widest mt-1">Bilateral knee flexion overlay — 0–100% session progress</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setCompareB(null)}
+              className="px-5 py-3 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-xs font-bold uppercase tracking-widest hover:border-primary/50 transition-all text-primary"
+            >
+              Change_B
+            </button>
+            <button
+              onClick={toggleCompare}
+              className="px-5 py-3 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-xs font-bold uppercase tracking-widest hover:border-error/50 transition-all text-on-surface-variant"
+            >
+              Exit_Compare
+            </button>
+          </div>
+        </motion.div>
+
+        {/* Session A / B labels */}
+        <div className="grid grid-cols-2 gap-6">
+          {([compareA, compareB] as const).map((s, i) => (
+            <motion.div
+              key={s.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="p-6 bg-surface-container-low border border-outline-variant rounded-2xl flex items-center gap-5"
+            >
+              <div className={cn(
+                'w-5 h-5 rounded-full shrink-0',
+                i === 0
+                  ? 'bg-primary shadow-[0_0_12px_#57f1db]'
+                  : 'bg-secondary shadow-[0_0_12px_#bcc7de]'
+              )} />
+              <div>
+                <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-widest font-bold mb-1">Session {i === 0 ? 'A' : 'B'}</p>
+                <p className="font-display font-bold text-on-surface text-lg">{s.label}</p>
+                <p className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest mt-1">
+                  {fmtDate(s.date)} · {fmtDuration(s.duration)} · Score {s.score}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Overlaid knee angle chart */}
+        <div className="glass-panel p-8 rounded-2xl space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-display font-bold text-on-surface flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              Knee Flexion Overlay
+            </h3>
+            <div className="flex flex-wrap gap-6 font-mono text-[10px] font-bold tracking-widest">
+              <span className="flex items-center gap-2"><span className="w-6 h-0.5 bg-primary inline-block rounded" /> A – Left</span>
+              <span className="flex items-center gap-2"><span className="w-6 h-0.5 bg-primary/40 inline-block rounded border-dashed" style={{ borderBottom: '2px dashed #57f1db66' }} /> A – Right</span>
+              <span className="flex items-center gap-2"><span className="w-6 h-0.5 bg-secondary inline-block rounded" /> B – Left</span>
+              <span className="flex items-center gap-2"><span className="w-6 h-0.5 bg-secondary/40 inline-block rounded" style={{ borderBottom: '2px dashed #bcc7de66' }} /> B – Right</span>
+            </div>
+          </div>
+          <div className="h-[320px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis dataKey="pct" hide />
+                <YAxis hide domain={[0, 180]} />
+                <Tooltip
+                  contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }}
+                  labelStyle={{ color: '#94a3b8', fontSize: 10 }}
+                  formatter={(v: number, name: string) => [v != null ? `${v.toFixed(1)}°` : '—', name]}
+                />
+                <Line type="monotone" dataKey="aLeft"  name="A – Left Knee"  stroke="#57f1db" strokeWidth={2.5} dot={false} connectNulls />
+                <Line type="monotone" dataKey="aRight" name="A – Right Knee" stroke="#57f1db" strokeWidth={1.5} strokeDasharray="5 3" dot={false} connectNulls strokeOpacity={0.55} />
+                <Line type="monotone" dataKey="bLeft"  name="B – Left Knee"  stroke="#bcc7de" strokeWidth={2.5} dot={false} connectNulls />
+                <Line type="monotone" dataKey="bRight" name="B – Right Knee" stroke="#bcc7de" strokeWidth={1.5} strokeDasharray="5 3" dot={false} connectNulls strokeOpacity={0.55} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Metrics diff table */}
+        <div className="bg-surface-container-low border border-outline-variant rounded-2xl overflow-hidden shadow-xl">
+          <div className="p-6 border-b border-outline-variant bg-surface-container-high/40">
+            <h3 className="font-display font-bold text-on-surface">Metrics Δ</h3>
+          </div>
+          <table className="w-full font-mono text-xs text-left">
+            <thead>
+              <tr className="bg-surface-container-highest/20">
+                <th className="p-5 text-[10px] text-on-surface-variant uppercase tracking-[0.2em] font-bold border-b border-outline-variant">Metric</th>
+                <th className="p-5 text-primary font-bold border-b border-outline-variant">Session A</th>
+                <th className="p-5 text-secondary font-bold border-b border-outline-variant">Session B</th>
+                <th className="p-5 text-[10px] text-on-surface-variant uppercase tracking-[0.2em] font-bold border-b border-outline-variant text-right">Δ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {diffRows.map((row, i) => (
+                <tr key={i} className="border-b border-outline-variant/30 hover:bg-surface-container-high/20 transition-colors">
+                  <td className="p-5 text-on-surface font-semibold">{row.label}</td>
+                  <td className="p-5 text-primary font-bold">{row.a}</td>
+                  <td className="p-5 text-secondary font-bold">{row.b}</td>
+                  <td className="p-5 text-right font-bold">
+                    {row.delta !== null ? (
+                      <span className={row.delta > 0 ? 'text-primary' : row.delta < 0 ? 'text-error' : 'text-on-surface-variant'}>
+                        {row.delta > 0 ? '+' : ''}{row.delta}{row.unit ? ` ${row.unit}` : ''}
+                      </span>
+                    ) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Detail view ────────────────────────────────────────────────────────
+  if (selectedSession) {
+    const chartData = selectedSession.kneeAngles.left.map((knee, i) => ({
+      time: i,
+      knee,
+      right: selectedSession.kneeAngles.right[i] ?? knee,
+    }));
+
+    return (
+      <div className="pt-24 pb-12 px-6 max-w-[1440px] mx-auto w-full space-y-8">
+        <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           className="flex justify-between items-center bg-surface-container p-6 rounded-2xl border border-outline-variant shadow-xl"
         >
           <div className="flex items-center gap-6">
-            <button 
+            <button
               onClick={() => setSelectedSession(null)}
               className="p-3 bg-surface-container-high hover:bg-surface-variant rounded-xl border border-outline-variant transition-all"
             >
@@ -39,10 +267,10 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
             </button>
             <div>
               <h2 className="text-2xl font-display font-bold text-on-surface">Analysis Trace: {selectedSession.id}</h2>
-              <p className="text-on-surface-variant font-mono text-[10px] uppercase tracking-widest">{selectedSession.type} // {selectedSession.date}</p>
+              <p className="text-on-surface-variant font-mono text-[10px] uppercase tracking-widest">{selectedSession.label} // {fmtDate(selectedSession.date)}</p>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => setSelectedSession(null)}
             className="px-6 py-3 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-xs font-bold uppercase tracking-widest hover:border-primary/50 transition-all text-primary"
           >
@@ -50,7 +278,6 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
           </button>
         </motion.div>
 
-        {/* Detailed Metrics (Reusing the existing detailed view logic) */}
         <div className="grid grid-cols-12 gap-8">
           <div className="col-span-12 lg:col-span-8 space-y-8">
             <div className="glass-panel p-8 rounded-2xl space-y-12">
@@ -61,20 +288,29 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
                   <p className="text-4xl font-display font-bold text-primary italic">{selectedSession.score}<span className="text-lg">/100</span></p>
                 </div>
               </div>
-              
+
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <span className="font-mono text-xs text-primary font-bold uppercase tracking-wider flex items-center gap-2">
                     <Activity className="w-4 h-4" /> Joint Flexion Dynamics
                   </span>
+                  <span className="font-mono text-[9px] text-on-surface-variant uppercase tracking-widest opacity-60">
+                    {selectedSession.frameCount} frames captured
+                  </span>
                 </div>
                 <div className="h-[300px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={mockChartData}>
+                    <AreaChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                       <XAxis dataKey="time" hide />
-                      <YAxis hide domain={[0, 100]} />
+                      <YAxis hide domain={[0, 180]} />
+                      <Tooltip
+                        contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }}
+                        labelStyle={{ color: '#94a3b8', fontSize: 10 }}
+                        formatter={(v: number, name: string) => [`${v.toFixed(1)}°`, name === 'knee' ? 'Left Knee' : 'Right Knee']}
+                      />
                       <Area type="monotone" dataKey="knee" stroke="#57f1db" fill="#57f1db" fillOpacity={0.1} strokeWidth={3} />
+                      <Area type="monotone" dataKey="right" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.05} strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -94,7 +330,7 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
               <div className="space-y-4">
                 <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant">
                   <span className="block font-mono text-[9px] text-on-surface-variant uppercase mb-1">Session Duration</span>
-                  <span className="text-xl font-display font-bold">{selectedSession.duration}</span>
+                  <span className="text-xl font-display font-bold">{fmtDuration(selectedSession.duration)}</span>
                 </div>
                 <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant">
                   <span className="block font-mono text-[9px] text-on-surface-variant uppercase mb-1">Baseline Status</span>
@@ -102,6 +338,16 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
                     {selectedSession.status}
                   </span>
                 </div>
+                <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant">
+                  <span className="block font-mono text-[9px] text-on-surface-variant uppercase mb-1">Frames Analyzed</span>
+                  <span className="text-xl font-display font-bold">{selectedSession.frameCount.toLocaleString()}</span>
+                </div>
+                {selectedSession.stride?.cadence ? (
+                  <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant">
+                    <span className="block font-mono text-[9px] text-on-surface-variant uppercase mb-1">Cadence</span>
+                    <span className="text-xl font-display font-bold text-primary">{selectedSession.stride.cadence} <span className="text-sm font-mono text-on-surface-variant">spm</span></span>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -110,20 +356,21 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
     );
   }
 
+  // ── Session list ───────────────────────────────────────────────────────
   return (
     <div className="pt-24 pb-12 px-6 max-w-[1440px] mx-auto w-full space-y-8">
       {/* Patient Header */}
       <section className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 bg-surface-container-low p-8 border border-outline-variant rounded-2xl shadow-xl">
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <motion.h1 
+            <motion.h1
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               className="text-4xl font-display font-bold text-on-surface tracking-tight"
             >
               Analysis Index: Marcus Thorne
             </motion.h1>
-            <button 
+            <button
               onClick={onViewProfile}
               className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-lg text-[9px] font-mono font-bold uppercase tracking-widest hover:bg-primary/20 transition-all"
             >
@@ -132,10 +379,22 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
           </div>
           <div className="flex flex-wrap gap-x-10 gap-y-3 font-mono text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">
             <span className="flex items-center gap-2"><Fingerprint className="w-4 h-4 text-primary" /> ID: GP-8829-X</span>
-            <span className="flex items-center gap-2"><ClipboardList className="w-4 h-4 text-primary" /> SESSIONS: {SESSIONS.length}</span>
+            <span className="flex items-center gap-2"><ClipboardList className="w-4 h-4 text-primary" /> SESSIONS: {sessions.length}</span>
           </div>
         </div>
         <div className="flex gap-4">
+          <button
+            onClick={toggleCompare}
+            className={cn(
+              'flex items-center gap-3 px-6 py-3 border font-mono text-xs font-bold rounded-xl transition-all active:scale-95',
+              compareMode
+                ? 'bg-primary/10 border-primary/40 text-primary'
+                : 'bg-surface-container-high border-outline-variant text-on-surface-variant hover:border-primary/50 hover:text-primary'
+            )}
+          >
+            <TrendingUp className="w-4 h-4" />
+            {compareMode ? 'EXIT_COMPARE' : 'COMPARE_SESSIONS'}
+          </button>
           <button className="flex items-center gap-3 px-6 py-3 bg-primary text-on-primary font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-all active:scale-95 shadow-lg shadow-primary/20">
             <FileDown className="w-4 h-4" />
             GENERATE_AGGREGATE_REPORT
@@ -145,46 +404,109 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
 
       {/* Sessions Index List */}
       <div className="grid grid-cols-1 gap-4">
-        <h3 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-[0.3em] font-bold px-2">Historical Capture Timeline</h3>
-        {SESSIONS.map((session, i) => (
-          <motion.div 
-            key={session.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            onClick={() => setSelectedSession(session)}
-            className="group glass-panel p-6 rounded-2xl border border-outline-variant hover:border-primary transition-all cursor-pointer flex justify-between items-center"
-          >
-            <div className="flex items-center gap-8">
-              <div className="w-14 h-14 bg-surface-container-high rounded-xl flex items-center justify-center font-mono text-xs text-primary border border-outline-variant group-hover:scale-105 transition-transform">
-                {session.id.split('-')[1]}
+        <div className="flex items-center justify-between px-2">
+          <h3 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-[0.3em] font-bold">Historical Capture Timeline</h3>
+          {compareMode && (
+            <p className="font-mono text-[10px] text-primary uppercase tracking-widest font-bold">
+              {!compareA ? 'Select Session A' : !compareB ? `A selected — pick Session B` : 'Both selected — view comparison'}
+            </p>
+          )}
+        </div>
+
+        {/* Compare launch bar — appears once both sessions are picked */}
+        <AnimatePresence>
+          {compareMode && compareA && compareB && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-center justify-between p-5 bg-primary/5 border border-primary/30 rounded-2xl"
+            >
+              <div className="font-mono text-[10px] text-primary uppercase tracking-widest font-bold flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                {compareA.label} vs {compareB.label}
               </div>
-              <div>
-                <h4 className="text-xl font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">{session.type}</h4>
-                <div className="flex items-center gap-4 font-mono text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">
-                  <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {session.date}</span>
-                  <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5" /> {session.duration}</span>
+              <button
+                onClick={() => {/* state already set, comparison view renders automatically */}}
+                className="px-5 py-2 bg-primary text-on-primary font-mono text-xs font-bold rounded-xl uppercase tracking-widest hover:opacity-90 transition-all"
+              >
+                View_Comparison →
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {sessions.length === 0 && (
+          <div className="py-16 flex flex-col items-center justify-center border border-outline-variant border-dashed rounded-2xl gap-4">
+            <Radio className="w-8 h-8 text-outline-variant" />
+            <p className="font-mono text-[11px] text-on-surface-variant uppercase tracking-[0.25em] text-center">
+              No sessions recorded — complete an analysis to begin building history
+            </p>
+          </div>
+        )}
+
+        {sessions.map((session, i) => {
+          const isA = compareA?.id === session.id;
+          const isB = compareB?.id === session.id;
+          const isSelected = isA || isB;
+
+          return (
+            <motion.div
+              key={session.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              onClick={() => compareMode ? handleCompareClick(session) : setSelectedSession(session)}
+              className={cn(
+                'group glass-panel p-6 rounded-2xl border transition-all cursor-pointer flex justify-between items-center',
+                isSelected
+                  ? isA
+                    ? 'border-primary bg-primary/5 shadow-[0_0_20px_rgba(87,241,219,0.1)]'
+                    : 'border-secondary bg-secondary/5'
+                  : 'border-outline-variant hover:border-primary'
+              )}
+            >
+              <div className="flex items-center gap-8">
+                <div className={cn(
+                  'w-14 h-14 rounded-xl flex items-center justify-center font-mono text-xs border transition-all',
+                  isA
+                    ? 'bg-primary text-on-primary border-primary font-bold text-sm'
+                    : isB
+                    ? 'bg-secondary/20 text-secondary border-secondary font-bold text-sm'
+                    : 'bg-surface-container-high text-primary border-outline-variant group-hover:scale-105'
+                )}>
+                  {isA ? 'A' : isB ? 'B' : String(i + 1).padStart(3, '0')}
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold text-on-surface mb-1 group-hover:text-primary transition-colors">{session.label}</h4>
+                  <div className="flex items-center gap-4 font-mono text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">
+                    <span className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {fmtDate(session.date)}</span>
+                    <span className="flex items-center gap-1.5"><Timer className="w-3.5 h-3.5" /> {fmtDuration(session.duration)}</span>
+                    {session.stride?.cadence ? (
+                      <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5 text-primary" /> {session.stride.cadence} spm</span>
+                    ) : null}
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center gap-12">
-              <div className="text-right">
-                <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-tighter opacity-60 mb-1 font-bold">Score</p>
-                <p className="text-2xl font-display font-bold text-on-surface">{session.score}%</p>
+
+              <div className="flex items-center gap-12">
+                <div className="text-right">
+                  <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-tighter opacity-60 mb-1 font-bold">Score</p>
+                  <p className="text-2xl font-display font-bold text-on-surface">{session.score}%</p>
+                </div>
+                <div className={cn(
+                  'px-4 py-1.5 rounded-lg font-mono text-[9px] font-bold uppercase tracking-widest border',
+                  session.status === 'Improved' ? 'bg-primary/10 border-primary/20 text-primary' :
+                  session.status === 'Stable'   ? 'bg-secondary/10 border-secondary/20 text-on-surface-variant' :
+                  'bg-error/10 border-error/20 text-error'
+                )}>
+                  {session.status}
+                </div>
               </div>
-              <div className={`px-4 py-1.5 rounded-lg font-mono text-[9px] font-bold uppercase tracking-widest border ${
-                session.status === 'Improved' ? 'bg-primary/10 border-primary/20 text-primary' : 
-                session.status === 'Stable' ? 'bg-secondary/10 border-secondary/20 text-on-surface-variant' :
-                'bg-error/10 border-error/20 text-error'
-              }`}>
-                {session.status}
-              </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
 }
-
