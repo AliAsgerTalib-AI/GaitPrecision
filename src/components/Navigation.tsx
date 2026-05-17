@@ -27,12 +27,13 @@ export default function Navigation({ currentView, onNavigate }: NavigationProps)
       <header className="fixed top-0 left-0 right-0 z-50 bg-surface/80 backdrop-blur-md border-b border-outline-variant">
         <div className="flex justify-between items-center w-full px-4 sm:px-6 max-w-[1440px] mx-auto h-16">
           <div className="flex items-center gap-8">
-            <span
-              className="text-xl sm:text-2xl font-display font-bold text-primary tracking-tight cursor-pointer"
+            <button
               onClick={() => onNavigate('home')}
+              className="flex items-center gap-2 focus:outline-none"
+              aria-label="Go to home"
             >
-              GaitPrecision
-            </span>
+              <img src="/logo.png" alt="Symphery" className="h-9 w-auto" />
+            </button>
             <nav className="hidden md:flex gap-6 items-center">
               {navItems.map((item) => (
                 <button

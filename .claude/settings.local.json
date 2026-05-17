@@ -24,7 +24,8 @@
       "Bash(ls api/)",
       "Bash(ls server*)",
       "Bash(npx tsc *)",
-      "PowerShell($key = [System.Environment]::GetEnvironmentVariable\\(\"GEMINI_API_KEY\"\\); if \\($key\\) { \"Key found: $\\($key.Substring\\(0,8\\)\\)...\" } else { \"Not set\" })"
+      "PowerShell($key = [System.Environment]::GetEnvironmentVariable\\(\"GEMINI_API_KEY\"\\); if \\($key\\) { \"Key found: $\\($key.Substring\\(0,8\\)\\)...\" } else { \"Not set\" })",
+      "PowerShell(New-Item *)"
     ]
   }
 }
