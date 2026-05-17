@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Zap, Activity, Footprints, CheckCircle2, Sparkles, AlertCircle, RefreshCcw } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
 import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
 import { mean } from '@/src/lib/utils';
 
@@ -65,47 +66,46 @@ export default function GeminiRecommendations() {
 
   useEffect(() => {
     let cancelled = false;
-    const abort = new AbortController();
 
     setStreamText('');
     setError('');
     setStatus('loading');
 
     (async () => {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        if (!cancelled) {
+          setError('Gemini API key not configured. Set GEMINI_API_KEY in your .env.local file.');
+          setStatus('error');
+        }
+        return;
+      }
+
       const sessions = await loadSessions();
       const session = sessions[0];
       if (!session) { if (!cancelled) setStatus('idle'); return; }
 
-      const response = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: buildPrompt(session) }),
-        signal: abort.signal,
-      });
-
-      if (!response.ok) throw new Error(`Request failed (${response.status})`);
-      if (!response.body) throw new Error('No response body');
-
       if (!cancelled) setStatus('streaming');
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+      const ai = new GoogleGenAI({ apiKey });
+      const stream = await ai.models.generateContentStream({
+        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+        contents: buildPrompt(session),
+      });
+
       let acc = '';
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (cancelled) { reader.cancel(); return; }
-        if (done) break;
-        acc += decoder.decode(value, { stream: true });
+      for await (const chunk of stream) {
+        if (cancelled) break;
+        acc += chunk.text ?? '';
         setStreamText(acc);
       }
 
       if (!cancelled) setStatus('done');
     })().catch(err => {
-      if (err.name === 'AbortError') return;
       if (!cancelled) { setError(err?.message ?? 'Request failed'); setStatus('error'); }
     });
 
-    return () => { cancelled = true; abort.abort(); };
+    return () => { cancelled = true; };
   }, [retryKey]);
 
   /* ── Error ── */

@@ -1,9 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Share2, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio } from 'lucide-react';
+import { Share2, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, fmtDate, fmtDuration } from '@/src/lib/utils';
-import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
+import { loadSessions, deleteSession, type GaitSession } from '@/src/lib/sessionDb';
 
 const Gait3D = lazy(() => import('./Gait3D'));
 
@@ -23,10 +23,19 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
   const [compareMode, setCompareMode] = useState(false);
   const [compareA, setCompareA] = useState<GaitSession | null>(null);
   const [compareB, setCompareB] = useState<GaitSession | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadSessions().then(setSessions).catch(console.error);
   }, []);
+
+  async function handleDelete(id: string) {
+    await deleteSession(id);
+    setConfirmDeleteId(null);
+    if (compareA?.id === id) setCompareA(null);
+    if (compareB?.id === id) setCompareB(null);
+    setSessions(prev => prev.filter(s => s.id !== id));
+  }
 
   function toggleCompare() {
     setCompareMode(m => !m);
@@ -463,9 +472,34 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
                 </div>
               </div>
 
-              <div className="text-right">
-                <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-tighter opacity-60 mb-1 font-bold">Score</p>
-                <p className="text-2xl font-display font-bold text-on-surface">{session.score}%</p>
+              <div className="flex items-center gap-6">
+                {confirmDeleteId === session.id ? (
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => handleDelete(session.id)}
+                      className="px-3 py-1.5 bg-error/10 border border-error/40 text-error rounded-lg font-mono text-[10px] font-bold uppercase tracking-widest hover:bg-error/20 transition-all"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="px-3 py-1.5 bg-surface-container-high border border-outline-variant rounded-lg font-mono text-[10px] font-bold text-on-surface-variant hover:border-primary/50 transition-all"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={e => { e.stopPropagation(); setConfirmDeleteId(session.id); }}
+                    className="p-2 rounded-lg text-on-surface-variant/30 hover:text-error hover:bg-error/10 transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <div className="text-right">
+                  <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-tighter opacity-60 mb-1 font-bold">Score</p>
+                  <p className="text-2xl font-display font-bold text-on-surface">{session.score}%</p>
+                </div>
               </div>
             </motion.div>
           );

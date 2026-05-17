@@ -18,12 +18,12 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return new Response('Server misconfiguration', { status: 500 });
   }
 
-  const model = process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
+  const model = process.env.VITE_GEMINI_MODEL ?? process.env.GEMINI_MODEL ?? 'gemini-2.0-flash';
   const ai = new GoogleGenAI({ apiKey });
 
   const geminiStream = await ai.models.generateContentStream({

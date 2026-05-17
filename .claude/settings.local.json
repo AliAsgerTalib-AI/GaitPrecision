@@ -19,7 +19,12 @@
       "Bash(node -e \"const p = require\\('./node_modules/lucide-react/package.json'\\); console.log\\(p.version\\)\")",
       "Bash(node -e \"const lr = require\\('./node_modules/lucide-react'\\); console.log\\('PersonStanding' in lr, 'Footprints' in lr\\)\")",
       "Bash(node *)",
-      "Bash(del *)"
+      "Bash(del *)",
+      "Bash(find . -name \"*.ts\" -path \"*/api/*\")",
+      "Bash(ls api/)",
+      "Bash(ls server*)",
+      "Bash(npx tsc *)",
+      "PowerShell($key = [System.Environment]::GetEnvironmentVariable\\(\"GEMINI_API_KEY\"\\); if \\($key\\) { \"Key found: $\\($key.Substring\\(0,8\\)\\)...\" } else { \"Not set\" })"
     ]
   }
 }
