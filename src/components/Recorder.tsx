@@ -147,8 +147,7 @@ export default function Recorder({ initialType = 'gait', onComplete, onCancel }:
           </div>
           <div>
             <h2 className="text-xl font-display font-bold text-on-surface leading-tight">Live Capture Engine</h2>
-            <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-widest">Session_ID: GP-CAPT-2026</p>
-          </div>
+            </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -321,37 +320,8 @@ export default function Recorder({ initialType = 'gait', onComplete, onCancel }:
                   </div>
                 </div>
 
-                <div className="text-right space-y-1">
-                  <div className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest">Telemetry_Feeds</div>
-                  <div className="flex flex-col gap-1 items-end">
-                    <div className="w-32 h-1 bg-surface-container rounded-full overflow-hidden">
-                       <motion.div 
-                        animate={{ width: isRecording ? '85%' : '40%' }} 
-                        className="h-full bg-primary" 
-                       />
-                    </div>
-                    <div className="w-24 h-1 bg-surface-container rounded-full overflow-hidden">
-                       <motion.div 
-                        animate={{ width: isRecording ? '62%' : '20%' }} 
-                        className="h-full bg-secondary" 
-                       />
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              <div className="flex justify-center items-center gap-12">
-                <div className="text-center group">
-                  <div className="font-mono text-[9px] text-on-surface-variant uppercase mb-2 tracking-[0.3em]">Pose_Lock</div>
-                  <div className="w-10 h-10 border border-primary/20 rounded-full flex items-center justify-center animate-dash">
-                    <div className="w-1 h-1 bg-primary rounded-full" />
-                  </div>
-                </div>
-                <div className="text-center opacity-40">
-                  <div className="font-mono text-[9px] text-on-surface-variant uppercase mb-2 tracking-[0.3em]">Ang_Res</div>
-                  <div className="font-mono text-xs text-on-surface font-bold italic">0.05°</div>
-                </div>
-              </div>
             </div>
           </>
         )}
@@ -492,17 +462,6 @@ export default function Recorder({ initialType = 'gait', onComplete, onCancel }:
           )}
         </AnimatePresence>
 
-        {isRecording && (
-          <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-3">
-            <div className="flex flex-col items-end">
-              <span className="font-mono text-[10px] text-on-surface-variant uppercase font-bold">Buffer Status</span>
-              <span className="font-mono text-xs text-primary font-bold">LIVE_OPTIMAL</span>
-            </div>
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Video className="w-5 h-5 text-primary" />
-            </div>
-          </div>
-        )}
         </div>
           )}
 

@@ -209,28 +209,6 @@ export default function SymmetryComparison() {
         <GeminiRecommendations />
       </section>
 
-       {/* Biometric Export CTA */}
-      <section className="flex flex-col items-center justify-center py-20 border-t border-outline-variant/30 mt-20 text-center">
-        <div className="max-w-xl mb-12">
-          <h3 className="text-3xl font-display font-bold text-on-surface mb-3">Complete Biometric Export</h3>
-          <p className="text-on-surface-variant text-lg">Generate high-fidelity DICOM-compliant reports for instant clinical integration.</p>
-        </div>
-
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="group relative flex items-center gap-4 bg-primary text-on-primary px-12 py-6 rounded-full font-display text-xl font-bold hover:brightness-110 transition-all shadow-2xl shadow-primary/20"
-        >
-          <span className="relative z-10">Generate DICOM Report</span>
-          <Scale className="w-6 h-6 relative z-10" />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-        </motion.button>
-
-        <p className="mt-8 font-mono text-[10px] text-primary/60 uppercase tracking-[0.3em] flex items-center gap-3 font-bold">
-          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-          End-to-End Encrypted Handshake Active
-        </p>
-      </section>
     </div>
   );
 }

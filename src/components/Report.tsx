@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Share2, FileDown, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio } from 'lucide-react';
+import { Share2, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, fmtDate, fmtDuration } from '@/src/lib/utils';
 import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
@@ -378,10 +378,6 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
           >
             <TrendingUp className="w-4 h-4" />
             {compareMode ? 'EXIT_COMPARE' : 'COMPARE_SESSIONS'}
-          </button>
-          <button className="flex items-center gap-3 px-6 py-3 bg-primary text-on-primary font-mono text-xs font-bold rounded-xl hover:opacity-90 transition-all active:scale-95 shadow-lg shadow-primary/20">
-            <FileDown className="w-4 h-4" />
-            GENERATE_AGGREGATE_REPORT
           </button>
         </div>
       </section>

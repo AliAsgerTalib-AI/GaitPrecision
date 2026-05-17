@@ -1,4 +1,4 @@
-import { Play, SkipBack, SkipForward, Maximize2, Radio, Activity, Waves, AlertCircle, AlertTriangle, Upload, Video } from 'lucide-react';
+import { Play, Radio, Activity, Waves, AlertCircle, AlertTriangle, Upload, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AnalysisSettings from './AnalysisSettings';
 import { useGaitAnalyzer } from '../hooks/useGaitAnalyzer';
@@ -244,7 +244,6 @@ export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardPro
               
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-6">
-                  <button className="text-on-surface hover:text-primary transition-colors"><SkipBack /></button>
                   <button
                     onClick={startAnalysis}
                     disabled={!isReady || isProcessing || !videoSrc}
@@ -256,8 +255,7 @@ export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardPro
                       <Play className="fill-current w-6 h-6 ml-1" />
                     )}
                   </button>
-                  <button className="text-on-surface hover:text-primary transition-colors"><SkipForward /></button>
-                  
+
                   <div className="flex flex-col ml-4">
                     <span className="font-mono text-xl text-on-surface font-bold tracking-tight leading-none tabular-nums">
                       {videoRef.current?.currentTime.toFixed(2) || '0.00'}
@@ -266,12 +264,9 @@ export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardPro
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 font-mono text-[10px] text-on-surface-variant bg-surface-container-high px-4 py-2 rounded-xl border border-outline-variant shadow-sm uppercase font-bold">
-                    <Radio className={cn("w-3 h-3 transition-colors", isProcessing ? "text-primary" : "text-outline")} />
-                    Mediapipe_v3.0
-                  </div>
-                  <button className="p-3 hover:bg-surface-variant rounded-xl transition-colors text-on-surface-variant"><Maximize2 className="w-5 h-5" /></button>
+                <div className="flex items-center gap-2 font-mono text-[10px] text-on-surface-variant bg-surface-container-high px-4 py-2 rounded-xl border border-outline-variant shadow-sm uppercase font-bold">
+                  <Radio className={cn("w-3 h-3 transition-colors", isProcessing ? "text-primary" : "text-outline")} />
+                  Mediapipe_v3.0
                 </div>
               </div>
             </div>
