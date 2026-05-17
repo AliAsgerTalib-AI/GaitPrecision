@@ -2,12 +2,19 @@ import { Settings2, Sliders, Target, ShieldCheck, Info } from 'lucide-react';
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import type { GaitConfig } from '@/src/hooks/useGaitAnalyzer';
+import { DEFAULT_CONFIG } from '@/src/hooks/useGaitAnalyzer';
 
-export default function AnalysisSettings() {
-  const [sensitivity, setSensitivity] = useState(75);
-  const [ankleThreshold, setAnkleThreshold] = useState(15);
-  const [kneeThreshold, setKneeThreshold] = useState(45);
-  const [autoScale, setAutoScale] = useState(true);
+interface AnalysisSettingsProps {
+  onApply: (config: GaitConfig) => void;
+  onReset: () => void;
+}
+
+export default function AnalysisSettings({ onApply, onReset }: AnalysisSettingsProps) {
+  const [sensitivity, setSensitivity] = useState(DEFAULT_CONFIG.sensitivity);
+  const [ankleThreshold, setAnkleThreshold] = useState(DEFAULT_CONFIG.ankleThreshold);
+  const [kneeThreshold, setKneeThreshold] = useState(DEFAULT_CONFIG.kneeThreshold);
+  const [autoScale, setAutoScale] = useState(DEFAULT_CONFIG.autoScale);
 
   return (
     <div className="bg-surface-container rounded-2xl p-8 border border-outline-variant shadow-xl mt-6">
@@ -115,10 +122,22 @@ export default function AnalysisSettings() {
           </div>
 
           <div className="pt-4 border-t border-outline-variant/30 flex flex-col gap-3">
-             <button className="w-full py-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase tracking-[0.2em] rounded-lg hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/10">
+             <button
+               onClick={() => onApply({ sensitivity, kneeThreshold, ankleThreshold, autoScale })}
+               className="w-full py-3 bg-primary text-on-primary font-mono text-[10px] font-bold uppercase tracking-[0.2em] rounded-lg hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/10"
+             >
                Apply_Parameters
              </button>
-             <button className="w-full py-2 bg-surface-container-high text-on-surface-variant font-mono text-[10px] font-bold uppercase tracking-[0.2em] rounded-lg border border-outline-variant hover:bg-outline-variant transition-colors">
+             <button
+               onClick={() => {
+                 setSensitivity(DEFAULT_CONFIG.sensitivity);
+                 setKneeThreshold(DEFAULT_CONFIG.kneeThreshold);
+                 setAnkleThreshold(DEFAULT_CONFIG.ankleThreshold);
+                 setAutoScale(DEFAULT_CONFIG.autoScale);
+                 onReset();
+               }}
+               className="w-full py-2 bg-surface-container-high text-on-surface-variant font-mono text-[10px] font-bold uppercase tracking-[0.2em] rounded-lg border border-outline-variant hover:bg-outline-variant transition-colors"
+             >
                Reset_Defaults
              </button>
           </div>

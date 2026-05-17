@@ -7,16 +7,17 @@ import { useCameraSetup, type SetupChecks } from '@/src/hooks/useCameraSetup';
 export type ActivityType = 'gait' | 'stair' | 'squat' | 'lift' | 'balance' | 'exercise';
 
 interface RecorderProps {
+  initialType?: ActivityType;
   onComplete: (videoBlob: Blob, type: ActivityType) => void;
   onCancel: () => void;
 }
 
-export default function Recorder({ onComplete, onCancel }: RecorderProps) {
+export default function Recorder({ initialType = 'gait', onComplete, onCancel }: RecorderProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const [activityType, setActivityType] = useState<ActivityType>('gait');
+  const [activityType, setActivityType] = useState<ActivityType>(initialType);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [setupDone, setSetupDone] = useState(false);
   const [isRecording, setIsRecording] = useState(false);

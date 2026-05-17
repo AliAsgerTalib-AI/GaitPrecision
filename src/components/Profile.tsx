@@ -1,10 +1,10 @@
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  User, History, Settings, Save, Activity, CheckCircle2, Download, X, FileJson, Upload,
+  User, History, Settings, Save, Activity, CheckCircle2, Download, X, FileJson, Upload, Trash2,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { getProfile, saveProfile, type UserProfile } from '@/src/lib/userProfile';
-import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
+import { loadSessions, clearAllSessions, deleteSession, type GaitSession } from '@/src/lib/sessionDb';
 import { fmtDate, fmtDuration, cn, mean } from '@/src/lib/utils';
 
 const EMPTY: UserProfile = { name: '', age: '', gender: '', heightCm: '', weightKg: '', notes: '' };
@@ -64,6 +64,8 @@ export default function Profile() {
   const [sessions, setSessions] = useState<GaitSession[]>([]);
   const [savedBanner, setSavedBanner] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -84,6 +86,18 @@ export default function Profile() {
   function handleCancel() {
     setDraft(profile ?? EMPTY);
     setIsEditing(false);
+  }
+
+  async function handleClearAll() {
+    await clearAllSessions();
+    setSessions([]);
+    setConfirmClear(false);
+  }
+
+  async function handleDeleteSession(id: string) {
+    await deleteSession(id);
+    setSessions(s => s.filter(x => x.id !== id));
+    setConfirmDeleteId(null);
   }
 
   function handleExportProfile() {
@@ -330,8 +344,37 @@ export default function Profile() {
                   <History className="w-4 h-4 text-primary" /> All sessions stored locally in IndexedDB.
                 </p>
               </div>
-              <div className="bg-primary/10 border border-primary/20 px-4 py-2 rounded-xl text-primary font-mono text-[11px] font-bold flex items-center gap-2">
-                <Activity className="w-4 h-4" /> {sessions.length} RECORD{sessions.length !== 1 ? 'S' : ''}
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 border border-primary/20 px-4 py-2 rounded-xl text-primary font-mono text-[11px] font-bold flex items-center gap-2">
+                  <Activity className="w-4 h-4" /> {sessions.length} RECORD{sessions.length !== 1 ? 'S' : ''}
+                </div>
+                {sessions.length > 0 && (
+                  confirmClear ? (
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[10px] text-error uppercase tracking-widest font-bold">Delete all?</span>
+                      <button
+                        onClick={handleClearAll}
+                        className="px-3 py-1.5 bg-error/10 border border-error/40 rounded-xl font-mono text-[10px] font-bold text-error uppercase tracking-widest hover:bg-error/20 transition-colors"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setConfirmClear(false)}
+                        className="p-1.5 bg-surface-container-high border border-outline-variant rounded-xl hover:bg-surface-variant transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5 text-on-surface-variant" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmClear(true)}
+                      title="Delete all history"
+                      className="p-2 bg-surface-container-high border border-outline-variant rounded-xl hover:border-error/50 hover:text-error text-on-surface-variant transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )
+                )}
               </div>
             </div>
 
@@ -380,6 +423,30 @@ export default function Profile() {
                         >
                           <FileJson className="w-4 h-4" />
                         </button>
+                        {confirmDeleteId === session.id ? (
+                          <>
+                            <button
+                              onClick={() => handleDeleteSession(session.id)}
+                              className="px-3 py-2 bg-error/10 border border-error/40 rounded-xl font-mono text-[10px] font-bold text-error uppercase tracking-widest hover:bg-error/20 transition-colors"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="p-2.5 bg-surface-container-high border border-outline-variant rounded-xl hover:bg-surface-variant transition-colors"
+                            >
+                              <X className="w-4 h-4 text-on-surface-variant" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDeleteId(session.id)}
+                            title="Delete this record"
+                            className="p-2.5 bg-surface-container-high border border-outline-variant rounded-xl hover:border-error/50 hover:text-error text-on-surface-variant transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </motion.div>

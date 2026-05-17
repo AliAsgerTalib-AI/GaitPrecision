@@ -1,4 +1,4 @@
-import { Play, SkipBack, SkipForward, Maximize2, Radio, Activity, Waves, Plus, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Play, SkipBack, SkipForward, Maximize2, Radio, Activity, Waves, AlertCircle, AlertTriangle, Upload, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AnalysisSettings from './AnalysisSettings';
 import { useGaitAnalyzer } from '../hooks/useGaitAnalyzer';
@@ -8,12 +8,19 @@ import { saveSession, scoreFromAngles, type GaitSession } from '@/src/lib/sessio
 
 interface DashboardProps {
   videoSrc?: string | null;
+  onRecord?: () => void;
+  onUpload?: (file: File) => void;
 }
 
-export default function Dashboard({ videoSrc }: DashboardProps) {
-  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis, getSessionData, visibilityWarning } = useGaitAnalyzer();
+export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardProps) {
+  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis, getSessionData, visibilityWarning, applyConfig, resetConfig } = useGaitAnalyzer();
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) { onUpload?.(file); e.target.value = ''; }
+  }
 
   // Simulate initial loading sequence for hardware and engine
   useEffect(() => {
@@ -141,15 +148,20 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
               playsInline
             />
 
+            <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+
             {/* No-video placeholder */}
             {!videoSrc && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-5">
-                <div className="w-16 h-16 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center">
-                  <Play className="w-7 h-7 text-on-surface-variant" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 z-5">
+                <p className="font-mono text-[11px] text-on-surface-variant uppercase tracking-[0.25em] opacity-50">No video loaded</p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button onClick={onRecord} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-primary/20">
+                    <Video className="w-4 h-4" /> Record Session
+                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-5 py-2.5 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                    <Upload className="w-4 h-4" /> Upload Video
+                  </button>
                 </div>
-                <p className="font-mono text-[11px] text-on-surface-variant uppercase tracking-[0.25em]">
-                  No video loaded — record or upload a session
-                </p>
               </div>
             )}
 
@@ -186,8 +198,18 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 bg-surface/40 backdrop-blur px-3 py-1.5 rounded-lg border border-outline-variant/30 font-mono text-[9px] text-on-surface-variant uppercase tracking-widest">
-                    Telemetry_Feed: <span className={cn(isProcessing ? "text-primary" : "text-on-surface-variant")}>Active</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 pointer-events-auto">
+                      <button onClick={() => fileInputRef.current?.click()} title="Upload video" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                        <Upload className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={onRecord} title="Record new session" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                        <Video className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 bg-surface/40 backdrop-blur px-3 py-1.5 rounded-lg border border-outline-variant/30 font-mono text-[9px] text-on-surface-variant uppercase tracking-widest">
+                      Telemetry_Feed: <span className={cn(isProcessing ? "text-primary" : "text-on-surface-variant")}>Active</span>
+                    </div>
                   </div>
                 </div>
 
@@ -463,17 +485,12 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
               </motion.div>
             </div>
 
-            <button className="w-full mt-8 py-5 bg-surface-container-low border border-outline-variant border-dashed rounded-2xl text-on-surface-variant font-mono text-[10px] font-bold tracking-[0.2em] hover:bg-surface-variant hover:border-primary/50 hover:text-primary transition-all flex items-center justify-center gap-3 group relative overflow-hidden">
-              <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform relative z-10" />
-              ADD_ANALYTICS_WIDGET
-              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </button>
           </div>
         </aside>
 
         {/* Configuration Hardware Section */}
         <div className="lg:col-span-12">
-          <AnalysisSettings />
+          <AnalysisSettings onApply={applyConfig} onReset={resetConfig} />
         </div>
       </div>
     </div>

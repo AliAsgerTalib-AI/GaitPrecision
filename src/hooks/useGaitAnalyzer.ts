@@ -13,6 +13,20 @@ const MAX_RECENT_STRIDES = 4;   // rolling window for cadence / phase % computat
 const VISIBILITY_THRESHOLD = 0.6; // min per-landmark confidence to include a reading
 const VISIBILITY_WARN_FRAMES = 20; // consecutive dropped frames before showing the leg-visibility warning
 
+export interface GaitConfig {
+  sensitivity: number;    // 0–100 → EMA alpha 0.05–0.45
+  kneeThreshold: number;  // °, heel-strike gate (HEEL_STRIKE_ANGLE)
+  ankleThreshold: number; // °, min deviation from 90° neutral to log ankle reading
+  autoScale: boolean;     // scale skeleton to fill 80% of canvas each frame
+}
+
+export const DEFAULT_CONFIG: GaitConfig = {
+  sensitivity: 50,
+  kneeThreshold: HEEL_STRIKE_ANGLE,
+  ankleThreshold: 15,
+  autoScale: true,
+};
+
 interface JointAngles {
   left: number[];
   right: number[];
@@ -27,11 +41,29 @@ interface LegGaitState {
   strideTimes: number[];   // rolling window of recent stride durations
 }
 
-function detectStrideEvent(state: LegGaitState, kneeAngle: number, t: number): void {
-  if (state.phase === 'stance' && kneeAngle < TOE_OFF_ANGLE) {
+// Scales normalized landmarks so the subject fills ~80% of the canvas each frame.
+// Uses lower-body landmark positions (hips → feet) as the anchor bounding box,
+// then applies the same transform to all landmarks so upper body stays coherent.
+function scaleLandmarksToFit(lm: NormalizedLandmark[]): NormalizedLandmark[] {
+  const LOWER_BODY = [23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
+  const anchor = LOWER_BODY.map(i => lm[i]).filter(p => p && (p.visibility ?? 1) >= 0.3);
+  if (anchor.length < 4) return lm;
+  const minX = Math.min(...anchor.map(p => p.x));
+  const maxX = Math.max(...anchor.map(p => p.x));
+  const minY = Math.min(...anchor.map(p => p.y));
+  const maxY = Math.max(...anchor.map(p => p.y));
+  if (maxX - minX < 0.05 || maxY - minY < 0.05) return lm;
+  const scale = 0.8 / Math.max(maxX - minX, maxY - minY);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  return lm.map(p => ({ ...p, x: 0.5 + (p.x - cx) * scale, y: 0.5 + (p.y - cy) * scale }));
+}
+
+function detectStrideEvent(state: LegGaitState, kneeAngle: number, t: number, heelStrikeAngle: number, toeOffAngle: number): void {
+  if (state.phase === 'stance' && kneeAngle < toeOffAngle) {
     state.lastToeOff = t;
     state.phase = 'swing';
-  } else if (state.phase === 'swing' && kneeAngle > HEEL_STRIKE_ANGLE) {
+  } else if (state.phase === 'swing' && kneeAngle > heelStrikeAngle) {
     if (state.lastHeelStrike >= 0) {
       const strideTime = t - state.lastHeelStrike;
       if (strideTime > 0.4 && strideTime < 3.0) { // physiological plausibility guard
@@ -83,6 +115,13 @@ export function useGaitAnalyzer() {
     left:  { stancePercent: 0, swingPercent: 0, strideTime: 0 },
     right: { stancePercent: 0, swingPercent: 0, strideTime: 0 },
   });
+
+  // Live-configurable parameters — written by applyConfig, read inside the rAF loop.
+  const emaAlphaRef        = useRef(EMA_ALPHA);
+  const heelStrikeRef      = useRef(HEEL_STRIKE_ANGLE);
+  const toeOffRef          = useRef(TOE_OFF_ANGLE);
+  const ankleDeviationRef  = useRef(DEFAULT_CONFIG.ankleThreshold);
+  const autoScaleRef       = useRef(DEFAULT_CONFIG.autoScale);
 
   // Refs keep landmarker and drawing utilities out of React state so the rAF
   // loop never reads stale closures and init never triggers extra re-renders.
@@ -218,7 +257,8 @@ export function useGaitAnalyzer() {
         const lm  = results.landmarks[0];      // 2D normalised — used for drawing + visibility
         const wlm = results.worldLandmarks[0]; // 3D world-space — used for angle maths
 
-        drawRef.current?.(ctx, lm);
+        const drawLm = autoScaleRef.current ? scaleLandmarksToFit(lm) : lm;
+        drawRef.current?.(ctx, drawLm);
         poseStore.write(lm); // feed Gait3D — before visibility gate so skeleton is always smooth
 
         // Visibility is carried on the 2D landmarks; use those to gate bad frames.
@@ -236,8 +276,9 @@ export function useGaitAnalyzer() {
           // ── Knee angles from 3D world landmarks (hip → knee → ankle) ─────
           const lKneeRaw = calculateAngle(wlm[23], wlm[25], wlm[27]);
           const rKneeRaw = calculateAngle(wlm[24], wlm[26], wlm[28]);
-          emaLeftRef.current  = isNaN(emaLeftRef.current)  ? lKneeRaw : EMA_ALPHA * lKneeRaw + (1 - EMA_ALPHA) * emaLeftRef.current;
-          emaRightRef.current = isNaN(emaRightRef.current) ? rKneeRaw : EMA_ALPHA * rKneeRaw + (1 - EMA_ALPHA) * emaRightRef.current;
+          const alpha = emaAlphaRef.current;
+          emaLeftRef.current  = isNaN(emaLeftRef.current)  ? lKneeRaw : alpha * lKneeRaw + (1 - alpha) * emaLeftRef.current;
+          emaRightRef.current = isNaN(emaRightRef.current) ? rKneeRaw : alpha * rKneeRaw + (1 - alpha) * emaRightRef.current;
           const kneeAcc = kneeAnglesRef.current;
           if (kneeAcc.left.length  >= HISTORY_CAP) kneeAcc.left.shift();
           if (kneeAcc.right.length >= HISTORY_CAP) kneeAcc.right.shift();
@@ -249,8 +290,8 @@ export function useGaitAnalyzer() {
           // ── Hip angles (opposite-hip → this-hip → this-knee) ─────────────
           const lHipRaw = calculateAngle(wlm[24], wlm[23], wlm[25]);
           const rHipRaw = calculateAngle(wlm[23], wlm[24], wlm[26]);
-          emaHipLeftRef.current  = isNaN(emaHipLeftRef.current)  ? lHipRaw : EMA_ALPHA * lHipRaw + (1 - EMA_ALPHA) * emaHipLeftRef.current;
-          emaHipRightRef.current = isNaN(emaHipRightRef.current) ? rHipRaw : EMA_ALPHA * rHipRaw + (1 - EMA_ALPHA) * emaHipRightRef.current;
+          emaHipLeftRef.current  = isNaN(emaHipLeftRef.current)  ? lHipRaw : alpha * lHipRaw + (1 - alpha) * emaHipLeftRef.current;
+          emaHipRightRef.current = isNaN(emaHipRightRef.current) ? rHipRaw : alpha * rHipRaw + (1 - alpha) * emaHipRightRef.current;
           const hipAcc = hipAnglesRef.current;
           if (hipAcc.left.length  >= HISTORY_CAP) hipAcc.left.shift();
           if (hipAcc.right.length >= HISTORY_CAP) hipAcc.right.shift();
@@ -264,21 +305,24 @@ export function useGaitAnalyzer() {
           if (lFoot2 && rFoot2 && vis(lFoot2) && vis(rFoot2)) {
             const lAnkleRaw = calculateAngle(wlm[25], wlm[27], wlm[31]);
             const rAnkleRaw = calculateAngle(wlm[26], wlm[28], wlm[32]);
-            emaAnkleLeftRef.current  = isNaN(emaAnkleLeftRef.current)  ? lAnkleRaw : EMA_ALPHA * lAnkleRaw + (1 - EMA_ALPHA) * emaAnkleLeftRef.current;
-            emaAnkleRightRef.current = isNaN(emaAnkleRightRef.current) ? rAnkleRaw : EMA_ALPHA * rAnkleRaw + (1 - EMA_ALPHA) * emaAnkleRightRef.current;
+            emaAnkleLeftRef.current  = isNaN(emaAnkleLeftRef.current)  ? lAnkleRaw : alpha * lAnkleRaw + (1 - alpha) * emaAnkleLeftRef.current;
+            emaAnkleRightRef.current = isNaN(emaAnkleRightRef.current) ? rAnkleRaw : alpha * rAnkleRaw + (1 - alpha) * emaAnkleRightRef.current;
             const ankleAcc = ankleAnglesRef.current;
             if (ankleAcc.left.length  >= HISTORY_CAP) ankleAcc.left.shift();
             if (ankleAcc.right.length >= HISTORY_CAP) ankleAcc.right.shift();
             ankleAcc.left.push(emaAnkleLeftRef.current);
             ankleAcc.right.push(emaAnkleRightRef.current);
-            ankleFullRef.current.left.push(emaAnkleLeftRef.current);
-            ankleFullRef.current.right.push(emaAnkleRightRef.current);
+            // Only log to full session data when deviation from neutral (90°) exceeds
+            // the ankle threshold — suppresses flat-foot noise during stance.
+            const ankleGate = ankleDeviationRef.current;
+            if (Math.abs(emaAnkleLeftRef.current  - 90) >= ankleGate) ankleFullRef.current.left.push(emaAnkleLeftRef.current);
+            if (Math.abs(emaAnkleRightRef.current - 90) >= ankleGate) ankleFullRef.current.right.push(emaAnkleRightRef.current);
           }
 
           // ── Stride event detection from knee threshold crossings ──────────
           const t = video.currentTime;
-          detectStrideEvent(gaitStateRef.current.left,  emaLeftRef.current,  t);
-          detectStrideEvent(gaitStateRef.current.right, emaRightRef.current, t);
+          detectStrideEvent(gaitStateRef.current.left,  emaLeftRef.current,  t, heelStrikeRef.current, toeOffRef.current);
+          detectStrideEvent(gaitStateRef.current.right, emaRightRef.current, t, heelStrikeRef.current, toeOffRef.current);
 
           // ── Flush a snapshot to React state every SYNC_EVERY frames ───────
           frameCountRef.current++;
@@ -333,6 +377,22 @@ export function useGaitAnalyzer() {
     ankleAngles: { left: [...ankleFullRef.current.left], right: [...ankleFullRef.current.right] },
   }), []);
 
+  const applyConfig = useCallback((cfg: GaitConfig) => {
+    emaAlphaRef.current       = 0.05 + (cfg.sensitivity / 100) * 0.40;
+    heelStrikeRef.current     = cfg.kneeThreshold;
+    toeOffRef.current         = Math.max(0, cfg.kneeThreshold - 15);
+    ankleDeviationRef.current = cfg.ankleThreshold;
+    autoScaleRef.current      = cfg.autoScale;
+  }, []);
+
+  const resetConfig = useCallback(() => {
+    emaAlphaRef.current       = EMA_ALPHA;
+    heelStrikeRef.current     = HEEL_STRIKE_ANGLE;
+    toeOffRef.current         = TOE_OFF_ANGLE;
+    ankleDeviationRef.current = DEFAULT_CONFIG.ankleThreshold;
+    autoScaleRef.current      = DEFAULT_CONFIG.autoScale;
+  }, []);
+
   const startAnalysis = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -373,5 +433,7 @@ export function useGaitAnalyzer() {
     getSessionData,
     visibilityWarning,
     startAnalysis,
+    applyConfig,
+    resetConfig,
   };
 }

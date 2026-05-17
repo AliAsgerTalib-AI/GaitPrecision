@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Activity, Radio, Waves } from 'lucide-react';
+import { Play, Activity, Radio, Waves, Upload, Video } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip,
 } from 'recharts';
@@ -9,6 +9,8 @@ import { cn } from '@/src/lib/utils';
 
 interface BalanceDashboardProps {
   videoSrc?: string | null;
+  onRecord?: () => void;
+  onUpload?: (file: File) => void;
 }
 
 function scoreLabel(s: number): string {
@@ -39,7 +41,7 @@ function formatDuration(s: number): string {
   return m > 0 ? `${m}:${sec.toString().padStart(2, '0')}` : `${sec}.${ms}s`;
 }
 
-export default function BalanceDashboard({ videoSrc }: BalanceDashboardProps) {
+export default function BalanceDashboard({ videoSrc, onRecord, onUpload }: BalanceDashboardProps) {
   const {
     videoRef, canvasRef, isReady, isProcessing,
     activeLeg, setActiveLeg, metrics, startAnalysis,
@@ -47,6 +49,11 @@ export default function BalanceDashboard({ videoSrc }: BalanceDashboardProps) {
 
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) { onUpload?.(file); e.target.value = ''; }
+  }
   const autoStartedSrcRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -139,14 +146,19 @@ export default function BalanceDashboard({ videoSrc }: BalanceDashboardProps) {
               playsInline
             />
 
+            <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+
             {!videoSrc && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-5">
-                <div className="w-16 h-16 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center">
-                  <Play className="w-7 h-7 text-on-surface-variant" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 z-5">
+                <p className="font-mono text-[11px] text-on-surface-variant uppercase tracking-[0.25em] opacity-50">No video loaded</p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button onClick={onRecord} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-primary/20">
+                    <Video className="w-4 h-4" /> Record Session
+                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-5 py-2.5 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                    <Upload className="w-4 h-4" /> Upload Video
+                  </button>
                 </div>
-                <p className="font-mono text-[11px] text-on-surface-variant uppercase tracking-[0.25em]">
-                  No video loaded — record a balance session
-                </p>
               </div>
             )}
 
@@ -178,21 +190,30 @@ export default function BalanceDashboard({ videoSrc }: BalanceDashboardProps) {
                   </div>
                 </div>
 
-                {/* Live score badge in corner */}
-                <AnimatePresence>
-                  {isProcessing && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className={cn(
-                        'px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold border',
-                        scoreBg(balanceScore),
-                      )}
-                    >
-                      {scoreLabel(balanceScore).toUpperCase()} · {balanceScore}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <div className="flex items-center gap-2">
+                  <AnimatePresence>
+                    {isProcessing && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className={cn(
+                          'px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold border',
+                          scoreBg(balanceScore),
+                        )}
+                      >
+                        {scoreLabel(balanceScore).toUpperCase()} · {balanceScore}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <div className="flex items-center gap-1.5 pointer-events-auto">
+                    <button onClick={() => fileInputRef.current?.click()} title="Upload video" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                      <Upload className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={onRecord} title="Record new session" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                      <Video className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Vertical center line — helps user see lateral drift */}

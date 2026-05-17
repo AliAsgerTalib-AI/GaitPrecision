@@ -49,13 +49,14 @@ function AppInner() {
           />
         ) : (
           <Hero
-            onStartAnalysis={() => setCurrentView('recording')}
+            onStartAnalysis={(type) => { setActivityType(type); setCurrentView('recording'); }}
             onUploadComplete={(file) => { setVideo(file); setCurrentView('dashboard'); }}
           />
         );
       case 'recording':
         return (
           <Recorder
+            initialType={activityType}
             onComplete={(blob, type) => {
               setActivityType(type);
               setVideo(blob);
@@ -64,15 +65,20 @@ function AppInner() {
             onCancel={() => setCurrentView('home')}
           />
         );
-      case 'dashboard':
-        if (activityType === 'balance') return <BalanceDashboard videoSrc={videoSrc} />;
-        if (activityType === 'stair')   return <StairDashboard videoSrc={videoSrc} />;
-        if (activityType === 'squat')   return <SquatDashboard videoSrc={videoSrc} />;
-        if (activityType === 'lift')     return <LiftDashboard videoSrc={videoSrc} />;
-        if (activityType === 'exercise') return <ExerciseDashboard videoSrc={videoSrc} />;
+      case 'dashboard': {
+        const dashProps = {
+          onRecord: () => setCurrentView('recording'),
+          onUpload: (file: File) => setVideo(file),
+        };
+        if (activityType === 'balance') return <BalanceDashboard videoSrc={videoSrc} {...dashProps} />;
+        if (activityType === 'stair')   return <StairDashboard   videoSrc={videoSrc} {...dashProps} />;
+        if (activityType === 'squat')   return <SquatDashboard   videoSrc={videoSrc} {...dashProps} />;
+        if (activityType === 'lift')    return <LiftDashboard    videoSrc={videoSrc} {...dashProps} />;
+        if (activityType === 'exercise') return <ExerciseDashboard videoSrc={videoSrc} {...dashProps} />;
         return mode === 'wellness'
           ? <WellnessDashboard videoSrc={videoSrc} />
-          : <Dashboard videoSrc={videoSrc} />;
+          : <Dashboard videoSrc={videoSrc} {...dashProps} />;
+      }
       case 'report':
         return mode === 'wellness' ? (
           <WellnessReport />

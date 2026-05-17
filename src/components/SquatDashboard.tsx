@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Activity, Radio, Waves, AlertTriangle } from 'lucide-react';
+import { Play, Activity, Radio, Waves, AlertTriangle, Upload, Video } from 'lucide-react';
 import {
   BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip,
 } from 'recharts';
@@ -9,6 +9,8 @@ import { cn } from '@/src/lib/utils';
 
 interface SquatDashboardProps {
   videoSrc?: string | null;
+  onRecord?: () => void;
+  onUpload?: (file: File) => void;
 }
 
 const DEPTH_LABEL: Record<SquatDepth, string> = {
@@ -39,10 +41,15 @@ function backAngleFeedback(angle: number): { label: string; color: string } {
   return               { label: 'Excessive lean', color: 'text-error' };
 }
 
-export default function SquatDashboard({ videoSrc }: SquatDashboardProps) {
+export default function SquatDashboard({ videoSrc, onRecord, onUpload }: SquatDashboardProps) {
   const { videoRef, canvasRef, isReady, isProcessing, metrics, startAnalysis } = useSquatAnalyzer();
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) { onUpload?.(file); e.target.value = ''; }
+  }
   const autoStartedSrcRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -146,14 +153,19 @@ export default function SquatDashboard({ videoSrc }: SquatDashboardProps) {
               playsInline
             />
 
+            <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
+
             {!videoSrc && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-5">
-                <div className="w-16 h-16 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center">
-                  <Play className="w-7 h-7 text-on-surface-variant" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 z-5">
+                <p className="font-mono text-[11px] text-on-surface-variant uppercase tracking-[0.25em] opacity-50">No video loaded</p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button onClick={onRecord} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-primary/20">
+                    <Video className="w-4 h-4" /> Record Session
+                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-5 py-2.5 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                    <Upload className="w-4 h-4" /> Upload Video
+                  </button>
                 </div>
-                <p className="font-mono text-[11px] text-on-surface-variant uppercase tracking-[0.25em]">
-                  No video loaded — record a squat session
-                </p>
               </div>
             )}
 
@@ -186,21 +198,30 @@ export default function SquatDashboard({ videoSrc }: SquatDashboardProps) {
                   </div>
                 </div>
 
-                {/* Live depth badge */}
-                <AnimatePresence>
-                  {isProcessing && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="bg-surface/80 backdrop-blur-md border border-outline-variant px-3 py-1.5 rounded-lg font-mono text-[10px]"
-                    >
-                      <span className="text-on-surface-variant mr-2 uppercase">Flex:</span>
-                      <span className={cn('font-bold tabular-nums', liveFlex >= 80 ? 'text-[#4ade80]' : liveFlex >= 50 ? 'text-primary' : 'text-on-surface-variant')}>
-                        {liveFlex}°
-                      </span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <div className="flex items-center gap-2">
+                  <AnimatePresence>
+                    {isProcessing && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="bg-surface/80 backdrop-blur-md border border-outline-variant px-3 py-1.5 rounded-lg font-mono text-[10px]"
+                      >
+                        <span className="text-on-surface-variant mr-2 uppercase">Flex:</span>
+                        <span className={cn('font-bold tabular-nums', liveFlex >= 80 ? 'text-[#4ade80]' : liveFlex >= 50 ? 'text-primary' : 'text-on-surface-variant')}>
+                          {liveFlex}°
+                        </span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <div className="flex items-center gap-1.5 pointer-events-auto">
+                    <button onClick={() => fileInputRef.current?.click()} title="Upload video" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                      <Upload className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={onRecord} title="Record new session" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                      <Video className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* No-rep warning */}

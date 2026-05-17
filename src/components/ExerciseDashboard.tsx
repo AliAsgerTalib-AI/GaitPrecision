@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Play, Activity, Radio, AlertTriangle } from 'lucide-react';
+import { Play, Activity, Radio, AlertTriangle, Upload, Video } from 'lucide-react';
 import {
   BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip,
   LineChart, Line,
@@ -10,6 +10,8 @@ import { cn } from '@/src/lib/utils';
 
 interface ExerciseDashboardProps {
   videoSrc?: string | null;
+  onRecord?: () => void;
+  onUpload?: (file: File) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -70,13 +72,18 @@ function depthColor(depth: ExerciseDepth): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ExerciseDashboard({ videoSrc }: ExerciseDashboardProps) {
+export default function ExerciseDashboard({ videoSrc, onRecord, onUpload }: ExerciseDashboardProps) {
   const {
     videoRef, canvasRef, metrics, isReady, isProcessing,
     exerciseType, setExerciseType, startAnalysis,
   } = useExerciseAnalyzer();
 
   const containerRef        = useRef<HTMLDivElement>(null);
+  const fileInputRef        = useRef<HTMLInputElement>(null);
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) { onUpload?.(file); e.target.value = ''; }
+  }
   const autoStartedSrcRef   = useRef<string | null>(null);
 
   // Auto-start when video is ready
@@ -185,12 +192,28 @@ export default function ExerciseDashboard({ videoSrc }: ExerciseDashboardProps) 
             ref={containerRef}
             className="relative bg-black rounded-3xl overflow-hidden border border-outline-variant aspect-video"
           >
+            <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
             <video
               ref={videoRef}
               src={videoSrc ?? undefined}
               autoPlay loop muted playsInline
               className="w-full h-full object-contain"
             />
+
+            {!videoSrc && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 z-20">
+                <p className="font-mono text-[11px] text-on-surface-variant uppercase tracking-[0.25em] opacity-50">No video loaded</p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button onClick={onRecord} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-primary/20">
+                    <Video className="w-4 h-4" /> Record Session
+                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-5 py-2.5 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                    <Upload className="w-4 h-4" /> Upload Video
+                  </button>
+                </div>
+              </div>
+            )}
+
             <canvas
               ref={canvasRef}
               className="absolute inset-0 w-full h-full"
@@ -231,6 +254,16 @@ export default function ExerciseDashboard({ videoSrc }: ExerciseDashboardProps) 
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Record / upload actions */}
+            <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5">
+              <button onClick={() => fileInputRef.current?.click()} title="Upload video" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                <Upload className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={onRecord} title="Record new session" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                <Video className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
             {/* Corner accents */}
             {['tl','tr','bl','br'].map(c => (
