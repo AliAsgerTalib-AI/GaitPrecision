@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Upload, Video, Activity, ScrollText, Zap, ShieldAlert, Cpu, DatabaseZap } from 'lucide-react';
+import { Upload, Zap, ShieldAlert, Cpu, DatabaseZap } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 
@@ -142,35 +142,6 @@ export default function Hero({ onStartAnalysis, onUploadComplete }: HeroProps) {
         </div>
       </section>
 
-      {/* Technology Teaser */}
-      <section className="max-w-[1440px] mx-auto px-6 py-20">
-        <div className="mb-12">
-          <h2 className="text-3xl font-display font-bold mb-2">Precision Engine Assets</h2>
-          <div className="h-1 w-20 bg-primary rounded-full shadow-[0_0_10px_#57f1db]" />
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            { icon: Video, title: 'Pose Detection', desc: 'MediaPipe tracking 33 skeletal keypoints with sub-millimeter precision directly in-browser.' },
-            { icon: Activity, title: 'Real-time Analysis', desc: 'High-performance WebAssembly modules execute biomechanical math at native speeds.' },
-            { icon: ScrollText, title: 'Detailed Reports', desc: 'Instantly generate clinical-grade PDF and CSV exports including stride length and cadence.' },
-          ].map((item, idx) => (
-            <motion.div 
-              key={idx} 
-              whileHover={{ y: -5 }}
-              className="p-8 bg-surface-container-low border border-outline-variant rounded-2xl hover:border-primary/40 transition-colors group"
-            >
-              <div className="w-12 h-12 flex items-center justify-center bg-surface-container-high rounded-xl mb-6 border border-outline-variant group-hover:border-primary/20">
-                <item.icon className="w-6 h-6 text-primary" />
-              </div>
-              <h4 className="text-xl font-display font-bold mb-3">{item.title}</h4>
-              <p className="text-on-surface-variant leading-relaxed">
-                {item.desc}
-              </p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

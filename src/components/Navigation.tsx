@@ -1,4 +1,4 @@
-import { ShieldCheck, Settings, Home, Activity, ScrollText, User, HelpCircle, Heart, FlaskConical } from 'lucide-react';
+import { ShieldCheck, Home, Activity, ScrollText, User, HelpCircle, Heart, FlaskConical } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useMode } from '@/src/lib/modeContext';
 
@@ -69,10 +69,6 @@ export default function Navigation({ currentView, onNavigate }: NavigationProps)
             >
               {mode === 'wellness' ? <Heart className="w-3.5 h-3.5" /> : <FlaskConical className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">{mode === 'wellness' ? 'Wellness' : 'Advanced'}</span>
-            </button>
-
-            <button className="p-2 text-on-surface-variant hover:text-primary transition-colors">
-              <Settings className="w-5 h-5" />
             </button>
 
             <button
