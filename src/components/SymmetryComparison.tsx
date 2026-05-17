@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import GeminiRecommendations from './GeminiRecommendations';
 import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
 import { mean } from '@/src/lib/utils';
+import { getNormsFromProfile } from '@/src/lib/normativeRanges';
 
 interface MetricRow {
   name: string;
@@ -11,6 +12,8 @@ interface MetricRow {
   right: string;
   variance: string;
   type: 'primary' | 'error';
+  norm?: string;
+  normSource?: string;
 }
 
 
@@ -21,6 +24,7 @@ function variancePct(l: number, r: number): string {
 
 function buildMetrics(session: GaitSession): MetricRow[] {
   const rows: MetricRow[] = [];
+  const norms = getNormsFromProfile();
 
   // Stance / Swing time from stride data
   if (session.stride?.left && session.stride.right) {
@@ -35,16 +39,26 @@ function buildMetrics(session: GaitSession): MetricRow[] {
       left: `${lStance.toFixed(2)}s`, right: `${rStance.toFixed(2)}s`,
       variance: stanceVar,
       type: parseFloat(stanceVar) > 8 ? 'error' : 'primary',
+      norm: `${norms.stancePct.mean} ± ${norms.stancePct.sd}% of cycle`,
+      normSource: norms.stancePct.source,
     });
     rows.push({
       name: 'Swing Time',
       left: `${lSwing.toFixed(2)}s`, right: `${rSwing.toFixed(2)}s`,
       variance: swingVar,
       type: parseFloat(swingVar) > 8 ? 'error' : 'primary',
+      norm: `${norms.swingPct.mean} ± ${norms.swingPct.sd}% of cycle`,
+      normSource: norms.swingPct.source,
     });
   } else {
-    rows.push({ name: 'Stance Time', left: '—', right: '—', variance: '—', type: 'primary' });
-    rows.push({ name: 'Swing Time',  left: '—', right: '—', variance: '—', type: 'primary' });
+    rows.push({
+      name: 'Stance Time', left: '—', right: '—', variance: '—', type: 'primary',
+      norm: `${norms.stancePct.mean} ± ${norms.stancePct.sd}% of cycle`, normSource: norms.stancePct.source,
+    });
+    rows.push({
+      name: 'Swing Time', left: '—', right: '—', variance: '—', type: 'primary',
+      norm: `${norms.swingPct.mean} ± ${norms.swingPct.sd}% of cycle`, normSource: norms.swingPct.source,
+    });
   }
 
   // Peak knee flexion (max angle in buffer)
@@ -57,6 +71,8 @@ function buildMetrics(session: GaitSession): MetricRow[] {
       left: `${lPeak.toFixed(1)}°`, right: `${rPeak.toFixed(1)}°`,
       variance: kVar,
       type: parseFloat(kVar) > 8 ? 'error' : 'primary',
+      norm: `${norms.kneeFlexionPeak.mean} ± ${norms.kneeFlexionPeak.sd}°`,
+      normSource: norms.kneeFlexionPeak.source,
     });
   }
 
@@ -70,6 +86,8 @@ function buildMetrics(session: GaitSession): MetricRow[] {
       left: `${lHip.toFixed(1)}°`, right: `${rHip.toFixed(1)}°`,
       variance: hVar,
       type: parseFloat(hVar) > 8 ? 'error' : 'primary',
+      norm: `${norms.hipAngleMean.mean} ± ${norms.hipAngleMean.sd}°`,
+      normSource: norms.hipAngleMean.source,
     });
   }
 
@@ -83,22 +101,16 @@ function buildMetrics(session: GaitSession): MetricRow[] {
       left: `${lDorsi.toFixed(1)}°`, right: `${rDorsi.toFixed(1)}°`,
       variance: aVar,
       type: parseFloat(aVar) > 8 ? 'error' : 'primary',
+      norm: `~${norms.dorsiflexionPeak.mean} ± ${norms.dorsiflexionPeak.sd}°`,
+      normSource: norms.dorsiflexionPeak.source,
     });
   }
 
   return rows;
 }
 
-const FALLBACK_METRICS: MetricRow[] = [
-  { name: 'Stance Time',        left: '0.62s',   right: '0.65s',   variance: '4.1%',  type: 'error'   },
-  { name: 'Swing Time',         left: '0.38s',   right: '0.39s',   variance: '0.8%',  type: 'primary' },
-  { name: 'Peak Knee Flexion',  left: '64.2°',   right: '58.1°',   variance: '11.4%', type: 'error'   },
-  { name: 'Hip Angle (mean)',   left: '172.4°',  right: '173.8°',  variance: '0.8%',  type: 'primary' },
-  { name: 'Peak Dorsiflexion',  left: '112.4°',  right: '115.2°',  variance: '2.5%',  type: 'primary' },
-];
-
 export default function SymmetryComparison() {
-  const [metrics, setMetrics] = useState<MetricRow[]>(FALLBACK_METRICS);
+  const [metrics, setMetrics] = useState<MetricRow[]>([]);
 
   useEffect(() => {
     loadSessions().then(sessions => {
@@ -136,9 +148,17 @@ export default function SymmetryComparison() {
                 <th className="p-6 font-mono text-xs text-primary font-bold border-b border-outline-variant">Left Metric</th>
                 <th className="p-6 font-mono text-[10px] text-on-surface-variant uppercase text-center border-b border-outline-variant">Variance Δ</th>
                 <th className="p-6 font-mono text-xs text-secondary font-bold border-b border-outline-variant text-right">Right Metric</th>
+                <th className="p-6 font-mono text-[10px] text-on-surface-variant uppercase tracking-[0.2em] border-b border-outline-variant text-right">Population Norm</th>
               </tr>
             </thead>
             <tbody className="font-mono text-xs">
+              {metrics.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-12 text-center font-mono text-[10px] text-on-surface-variant uppercase tracking-widest opacity-40">
+                    No session data — complete a gait analysis to populate metrics
+                  </td>
+                </tr>
+              )}
               {metrics.map((row, idx) => (
                 <motion.tr
                   key={idx}
@@ -160,6 +180,16 @@ export default function SymmetryComparison() {
                     </div>
                   </td>
                   <td className="p-6 text-secondary font-bold text-right italic">{row.right}</td>
+                  <td className="p-6 text-right">
+                    {row.norm ? (
+                      <div className="flex flex-col items-end gap-0.5">
+                        <span className="text-on-surface-variant font-mono text-[11px]">{row.norm}</span>
+                        <span className="text-on-surface-variant/40 font-mono text-[9px] uppercase tracking-wider">{row.normSource}</span>
+                      </div>
+                    ) : (
+                      <span className="text-on-surface-variant/30">—</span>
+                    )}
+                  </td>
                 </motion.tr>
               ))}
             </tbody>

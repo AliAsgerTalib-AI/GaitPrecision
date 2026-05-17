@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import type { NormalizedLandmark, PoseLandmarker } from '@mediapipe/tasks-vision';
+import type { NormalizedLandmark, Landmark, PoseLandmarker } from '@mediapipe/tasks-vision';
 import { MEDIAPIPE_WASM_PATH, MEDIAPIPE_MODEL_PATH } from '@/src/lib/mediapipe-config';
 import type { StrideMetrics, LegStrideMetrics } from '@/src/lib/sessionDb';
 import { poseStore } from '@/src/lib/poseStore';
@@ -11,6 +11,7 @@ const HEEL_STRIKE_ANGLE = 155;  // (°) knee above this while in swing → heel-
 const TOE_OFF_ANGLE = 140;      // (°) knee below this while in stance → toe-off
 const MAX_RECENT_STRIDES = 4;   // rolling window for cadence / phase % computation
 const VISIBILITY_THRESHOLD = 0.6; // min per-landmark confidence to include a reading
+const VISIBILITY_WARN_FRAMES = 20; // consecutive dropped frames before showing the leg-visibility warning
 
 interface JointAngles {
   left: number[];
@@ -51,13 +52,15 @@ function detectStrideEvent(state: LegGaitState, kneeAngle: number, t: number): v
 function computeLegMetrics(state: LegGaitState): LegStrideMetrics {
   if (state.strideTimes.length === 0) return { stancePercent: 0, swingPercent: 0, strideTime: 0 };
   const avgStride = state.strideTimes.reduce((a, b) => a + b, 0) / state.strideTimes.length;
-  const stancePct = state.stanceTimes.length > 0
+  const measured  = state.stanceTimes.length > 0;
+  const stancePct = measured
     ? Math.round((state.stanceTimes.reduce((a, b) => a + b, 0) / state.stanceTimes.length / avgStride) * 100)
-    : 62; // typical gait ratio until enough toe-off events accumulate
+    : 62;
   return {
-    stancePercent: Math.min(100, stancePct),
-    swingPercent:  Math.min(100, 100 - stancePct),
-    strideTime: avgStride,
+    stancePercent:    Math.min(100, stancePct),
+    swingPercent:     Math.min(100, 100 - stancePct),
+    strideTime:       avgStride,
+    stanceEstimated:  !measured,
   };
 }
 
@@ -71,6 +74,7 @@ export function useGaitAnalyzer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [visibilityWarning, setVisibilityWarning] = useState(false);
   const [kneeAngles,   setKneeAngles]   = useState<JointAngles>({ left: [], right: [] });
   const [hipAngles,    setHipAngles]    = useState<JointAngles>({ left: [], right: [] });
   const [ankleAngles,  setAnkleAngles]  = useState<JointAngles>({ left: [], right: [] });
@@ -87,10 +91,14 @@ export function useGaitAnalyzer() {
   const requestRef = useRef<number | null>(null);
   const lastVideoTimeRef = useRef<number>(-1);
 
-  // Mutable angle accumulators — written every detected frame, no re-renders on their own.
+  // Display buffers — capped at HISTORY_CAP for live UI rendering.
   const kneeAnglesRef  = useRef<JointAngles>({ left: [], right: [] });
   const hipAnglesRef   = useRef<JointAngles>({ left: [], right: [] });
   const ankleAnglesRef = useRef<JointAngles>({ left: [], right: [] });
+  // Full-session accumulators — never truncated, used for saving and scoring.
+  const kneeFullRef  = useRef<JointAngles>({ left: [], right: [] });
+  const hipFullRef   = useRef<JointAngles>({ left: [], right: [] });
+  const ankleFullRef = useRef<JointAngles>({ left: [], right: [] });
   // Mirrors isProcessing so the rAF closure stays stable (no closure capture of state).
   const isProcessingRef = useRef(false);
   // Counts detected frames; a state flush fires every SYNC_EVERY increments.
@@ -104,6 +112,10 @@ export function useGaitAnalyzer() {
   const emaAnkleRightRef  = useRef(NaN);
   // Per-leg gait-phase state for stride event detection.
   const gaitStateRef = useRef(freshGaitState());
+  // Consecutive frames where key landmarks failed the visibility gate.
+  // Only triggers a setState on transitions to keep the rAF loop cheap.
+  const consecutiveDropRef  = useRef(0);
+  const visibilityWarnRef   = useRef(false);
 
   useEffect(() => {
     isProcessingRef.current = isProcessing;
@@ -174,12 +186,16 @@ export function useGaitAnalyzer() {
     };
   }, []);
 
-  const calculateAngle = (p1: NormalizedLandmark, p2: NormalizedLandmark, p3: NormalizedLandmark) => {
-    const radians =
-      Math.atan2(p3.y - p2.y, p3.x - p2.x) - Math.atan2(p1.y - p2.y, p1.x - p2.x);
-    let angle = Math.abs((radians * 180.0) / Math.PI);
-    if (angle > 180.0) angle = 360 - angle;
-    return angle;
+  // 3D dot-product angle — view-independent because worldLandmarks are in
+  // real-space metres relative to the pelvis, not screen pixels.
+  const calculateAngle = (p1: Landmark, p2: Landmark, p3: Landmark): number => {
+    const v1x = p1.x - p2.x, v1y = p1.y - p2.y, v1z = p1.z - p2.z;
+    const v2x = p3.x - p2.x, v2y = p3.y - p2.y, v2z = p3.z - p2.z;
+    const dot  = v1x*v2x + v1y*v2y + v1z*v2z;
+    const mag1 = Math.sqrt(v1x**2 + v1y**2 + v1z**2);
+    const mag2 = Math.sqrt(v2x**2 + v2y**2 + v2z**2);
+    if (mag1 === 0 || mag2 === 0) return 0;
+    return Math.acos(Math.max(-1, Math.min(1, dot / (mag1 * mag2)))) * 180 / Math.PI;
   };
 
   // Stable callback — reads only refs, never captures state, so it is safe to
@@ -198,21 +214,28 @@ export function useGaitAnalyzer() {
       const results = poseLandmarkerRef.current.detectForVideo(video, performance.now());
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (results.landmarks?.length) {
-        const lm = results.landmarks[0];
+      if (results.landmarks?.length && results.worldLandmarks?.length) {
+        const lm  = results.landmarks[0];      // 2D normalised — used for drawing + visibility
+        const wlm = results.worldLandmarks[0]; // 3D world-space — used for angle maths
+
         drawRef.current?.(ctx, lm);
         poseStore.write(lm); // feed Gait3D — before visibility gate so skeleton is always smooth
 
-        // Landmark indices: hip 23/24, knee 25/26, ankle 27/28, foot-index 31/32
-        const lHip = lm[23], lKnee = lm[25], lAnkle = lm[27];
-        const rHip = lm[24], rKnee = lm[26], rAnkle = lm[28];
+        // Visibility is carried on the 2D landmarks; use those to gate bad frames.
+        const vis = (l: NormalizedLandmark) => (l.visibility ?? 1) >= VISIBILITY_THRESHOLD;
+        const lHip2 = lm[23], lKnee2 = lm[25], lAnkle2 = lm[27];
+        const rHip2 = lm[24], rKnee2 = lm[26], rAnkle2 = lm[28];
 
-        const vis = (lm: NormalizedLandmark) => (lm.visibility ?? 1) >= VISIBILITY_THRESHOLD;
-        if (lHip && lKnee && lAnkle && rHip && rKnee && rAnkle &&
-            vis(lHip) && vis(lKnee) && vis(lAnkle) && vis(rHip) && vis(rKnee) && vis(rAnkle)) {
-          // ── Knee angles (hip → knee → ankle) ─────────────────────────────
-          const lKneeRaw = calculateAngle(lHip, lKnee, lAnkle);
-          const rKneeRaw = calculateAngle(rHip, rKnee, rAnkle);
+        const landmarksOk = lHip2 && lKnee2 && lAnkle2 && rHip2 && rKnee2 && rAnkle2 &&
+            vis(lHip2) && vis(lKnee2) && vis(lAnkle2) && vis(rHip2) && vis(rKnee2) && vis(rAnkle2);
+
+        if (landmarksOk) {
+          consecutiveDropRef.current = 0;
+          if (visibilityWarnRef.current) { visibilityWarnRef.current = false; setVisibilityWarning(false); }
+
+          // ── Knee angles from 3D world landmarks (hip → knee → ankle) ─────
+          const lKneeRaw = calculateAngle(wlm[23], wlm[25], wlm[27]);
+          const rKneeRaw = calculateAngle(wlm[24], wlm[26], wlm[28]);
           emaLeftRef.current  = isNaN(emaLeftRef.current)  ? lKneeRaw : EMA_ALPHA * lKneeRaw + (1 - EMA_ALPHA) * emaLeftRef.current;
           emaRightRef.current = isNaN(emaRightRef.current) ? rKneeRaw : EMA_ALPHA * rKneeRaw + (1 - EMA_ALPHA) * emaRightRef.current;
           const kneeAcc = kneeAnglesRef.current;
@@ -220,10 +243,12 @@ export function useGaitAnalyzer() {
           if (kneeAcc.right.length >= HISTORY_CAP) kneeAcc.right.shift();
           kneeAcc.left.push(emaLeftRef.current);
           kneeAcc.right.push(emaRightRef.current);
+          kneeFullRef.current.left.push(emaLeftRef.current);
+          kneeFullRef.current.right.push(emaRightRef.current);
 
           // ── Hip angles (opposite-hip → this-hip → this-knee) ─────────────
-          const lHipRaw = calculateAngle(lm[24], lm[23], lm[25]);
-          const rHipRaw = calculateAngle(lm[23], lm[24], lm[26]);
+          const lHipRaw = calculateAngle(wlm[24], wlm[23], wlm[25]);
+          const rHipRaw = calculateAngle(wlm[23], wlm[24], wlm[26]);
           emaHipLeftRef.current  = isNaN(emaHipLeftRef.current)  ? lHipRaw : EMA_ALPHA * lHipRaw + (1 - EMA_ALPHA) * emaHipLeftRef.current;
           emaHipRightRef.current = isNaN(emaHipRightRef.current) ? rHipRaw : EMA_ALPHA * rHipRaw + (1 - EMA_ALPHA) * emaHipRightRef.current;
           const hipAcc = hipAnglesRef.current;
@@ -231,12 +256,14 @@ export function useGaitAnalyzer() {
           if (hipAcc.right.length >= HISTORY_CAP) hipAcc.right.shift();
           hipAcc.left.push(emaHipLeftRef.current);
           hipAcc.right.push(emaHipRightRef.current);
+          hipFullRef.current.left.push(emaHipLeftRef.current);
+          hipFullRef.current.right.push(emaHipRightRef.current);
 
           // ── Ankle angles (knee → ankle → foot-index) ─────────────────────
-          const lFoot = lm[31], rFoot = lm[32];
-          if (lFoot && rFoot && vis(lFoot) && vis(rFoot)) {
-            const lAnkleRaw = calculateAngle(lm[25], lm[27], lFoot);
-            const rAnkleRaw = calculateAngle(lm[26], lm[28], rFoot);
+          const lFoot2 = lm[31], rFoot2 = lm[32];
+          if (lFoot2 && rFoot2 && vis(lFoot2) && vis(rFoot2)) {
+            const lAnkleRaw = calculateAngle(wlm[25], wlm[27], wlm[31]);
+            const rAnkleRaw = calculateAngle(wlm[26], wlm[28], wlm[32]);
             emaAnkleLeftRef.current  = isNaN(emaAnkleLeftRef.current)  ? lAnkleRaw : EMA_ALPHA * lAnkleRaw + (1 - EMA_ALPHA) * emaAnkleLeftRef.current;
             emaAnkleRightRef.current = isNaN(emaAnkleRightRef.current) ? rAnkleRaw : EMA_ALPHA * rAnkleRaw + (1 - EMA_ALPHA) * emaAnkleRightRef.current;
             const ankleAcc = ankleAnglesRef.current;
@@ -244,6 +271,8 @@ export function useGaitAnalyzer() {
             if (ankleAcc.right.length >= HISTORY_CAP) ankleAcc.right.shift();
             ankleAcc.left.push(emaAnkleLeftRef.current);
             ankleAcc.right.push(emaAnkleRightRef.current);
+            ankleFullRef.current.left.push(emaAnkleLeftRef.current);
+            ankleFullRef.current.right.push(emaAnkleRightRef.current);
           }
 
           // ── Stride event detection from knee threshold crossings ──────────
@@ -270,6 +299,19 @@ export function useGaitAnalyzer() {
               right: rightLeg,
             });
           }
+        } else {
+          consecutiveDropRef.current++;
+          if (consecutiveDropRef.current >= VISIBILITY_WARN_FRAMES && !visibilityWarnRef.current) {
+            visibilityWarnRef.current = true;
+            setVisibilityWarning(true);
+          }
+        }
+      } else {
+        // No person detected in this frame at all.
+        consecutiveDropRef.current++;
+        if (consecutiveDropRef.current >= VISIBILITY_WARN_FRAMES && !visibilityWarnRef.current) {
+          visibilityWarnRef.current = true;
+          setVisibilityWarning(true);
         }
       }
     }
@@ -285,6 +327,12 @@ export function useGaitAnalyzer() {
     }
   }, [isProcessing, processFrame]);
 
+  const getSessionData = useCallback(() => ({
+    kneeAngles:  { left: [...kneeFullRef.current.left],  right: [...kneeFullRef.current.right]  },
+    hipAngles:   { left: [...hipFullRef.current.left],   right: [...hipFullRef.current.right]   },
+    ankleAngles: { left: [...ankleFullRef.current.left], right: [...ankleFullRef.current.right] },
+  }), []);
+
   const startAnalysis = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -292,6 +340,9 @@ export function useGaitAnalyzer() {
     kneeAnglesRef.current  = { left: [], right: [] };
     hipAnglesRef.current   = { left: [], right: [] };
     ankleAnglesRef.current = { left: [], right: [] };
+    kneeFullRef.current    = { left: [], right: [] };
+    hipFullRef.current     = { left: [], right: [] };
+    ankleFullRef.current   = { left: [], right: [] };
     frameCountRef.current  = 0;
     lastVideoTimeRef.current = -1;
     emaLeftRef.current        = NaN;
@@ -301,6 +352,9 @@ export function useGaitAnalyzer() {
     emaAnkleLeftRef.current   = NaN;
     emaAnkleRightRef.current  = NaN;
     gaitStateRef.current = freshGaitState();
+    consecutiveDropRef.current = 0;
+    visibilityWarnRef.current  = false;
+    setVisibilityWarning(false);
     // Stop processing cleanly when the clip finishes.
     video.addEventListener('ended', () => setIsProcessing(false), { once: true });
     video.play().catch(console.error);
@@ -316,6 +370,8 @@ export function useGaitAnalyzer() {
     hipAngles,
     ankleAngles,
     strideMetrics,
+    getSessionData,
+    visibilityWarning,
     startAnalysis,
   };
 }

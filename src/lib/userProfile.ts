@@ -15,11 +15,11 @@ export const BENCHMARKS: Record<AgeGroup, { cadence: number; score: number; stan
   '75plus':  { cadence: 100, score: 74, stancePercent: 64 },
 };
 
-const KEY = 'gp_age_group';
+const AGE_GROUP_KEY = 'gp_age_group';
 
 export function getAgeGroup(): AgeGroup | null {
   try {
-    return (localStorage.getItem(KEY) as AgeGroup) ?? null;
+    return (localStorage.getItem(AGE_GROUP_KEY) as AgeGroup) ?? null;
   } catch {
     return null;
   }
@@ -27,7 +27,44 @@ export function getAgeGroup(): AgeGroup | null {
 
 export function saveAgeGroup(group: AgeGroup): void {
   try {
-    localStorage.setItem(KEY, group);
+    localStorage.setItem(AGE_GROUP_KEY, group);
+  } catch {
+    // storage unavailable — ignore
+  }
+}
+
+// ── Full user profile ──────────────────────────────────────────────────────
+
+export interface UserProfile {
+  name: string;
+  age: string;
+  gender: string;
+  heightCm: string;
+  weightKg: string;
+  notes: string;
+}
+
+const PROFILE_KEY = 'gp_user_profile';
+
+export function getProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return raw ? (JSON.parse(raw) as UserProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveProfile(profile: UserProfile): void {
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    // Keep age group in sync for benchmark comparisons
+    const age = parseInt(profile.age, 10);
+    if (!isNaN(age)) {
+      const group: AgeGroup =
+        age < 40 ? 'under40' : age < 60 ? '40-59' : age < 75 ? '60-74' : '75plus';
+      saveAgeGroup(group);
+    }
   } catch {
     // storage unavailable — ignore
   }

@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Share2, FileDown, Fingerprint, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio } from 'lucide-react';
+import { Share2, FileDown, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, fmtDate, fmtDuration } from '@/src/lib/utils';
 import { loadSessions, type GaitSession } from '@/src/lib/sessionDb';
@@ -96,7 +96,7 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
         unit: '%',
       },
       {
-        label: 'Frames Analyzed',
+        label: 'Frames',
         a: `${compareA.frameCount}`,
         b: `${compareB.frameCount}`,
         delta: compareB.frameCount - compareA.frameCount,
@@ -233,10 +233,13 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
 
   // ── Detail view ────────────────────────────────────────────────────────
   if (selectedSession) {
-    const chartData = selectedSession.kneeAngles.left.map((knee, i) => ({
+    const N = Math.min(300, selectedSession.kneeAngles.left.length);
+    const leftSampled  = sampleToN(selectedSession.kneeAngles.left,  N);
+    const rightSampled = sampleToN(selectedSession.kneeAngles.right, N);
+    const chartData = leftSampled.map((knee, i) => ({
       time: i,
       knee,
-      right: selectedSession.kneeAngles.right[i] ?? knee,
+      right: rightSampled[i],
     }));
 
     return (
@@ -321,12 +324,6 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
                   <span className="text-xl font-display font-bold">{fmtDuration(selectedSession.duration)}</span>
                 </div>
                 <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant">
-                  <span className="block font-mono text-[9px] text-on-surface-variant uppercase mb-1">Baseline Status</span>
-                  <span className={`text-xl font-display font-bold ${selectedSession.status === 'Critical' ? 'text-error' : 'text-primary'}`}>
-                    {selectedSession.status}
-                  </span>
-                </div>
-                <div className="p-4 bg-surface-container-low rounded-xl border border-outline-variant">
                   <span className="block font-mono text-[9px] text-on-surface-variant uppercase mb-1">Frames Analyzed</span>
                   <span className="text-xl font-display font-bold">{selectedSession.frameCount.toLocaleString()}</span>
                 </div>
@@ -356,7 +353,7 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
               animate={{ opacity: 1, x: 0 }}
               className="text-4xl font-display font-bold text-on-surface tracking-tight"
             >
-              Analysis Index: Marcus Thorne
+              Analysis Index
             </motion.h1>
             <button
               onClick={onViewProfile}
@@ -366,7 +363,6 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
             </button>
           </div>
           <div className="flex flex-wrap gap-x-10 gap-y-3 font-mono text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">
-            <span className="flex items-center gap-2"><Fingerprint className="w-4 h-4 text-primary" /> ID: GP-8829-X</span>
             <span className="flex items-center gap-2"><ClipboardList className="w-4 h-4 text-primary" /> SESSIONS: {sessions.length}</span>
           </div>
         </div>
@@ -471,19 +467,9 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
                 </div>
               </div>
 
-              <div className="flex items-center gap-12">
-                <div className="text-right">
-                  <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-tighter opacity-60 mb-1 font-bold">Score</p>
-                  <p className="text-2xl font-display font-bold text-on-surface">{session.score}%</p>
-                </div>
-                <div className={cn(
-                  'px-4 py-1.5 rounded-lg font-mono text-[9px] font-bold uppercase tracking-widest border',
-                  session.status === 'Improved' ? 'bg-primary/10 border-primary/20 text-primary' :
-                  session.status === 'Stable'   ? 'bg-secondary/10 border-secondary/20 text-on-surface-variant' :
-                  'bg-error/10 border-error/20 text-error'
-                )}>
-                  {session.status}
-                </div>
+              <div className="text-right">
+                <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-tighter opacity-60 mb-1 font-bold">Score</p>
+                <p className="text-2xl font-display font-bold text-on-surface">{session.score}%</p>
               </div>
             </motion.div>
           );

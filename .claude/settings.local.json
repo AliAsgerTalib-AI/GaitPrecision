@@ -5,7 +5,21 @@
       "Bash(npm install *)",
       "Bash(npm run *)",
       "Bash(node -e \"const pkg = require\\('./node_modules/@mediapipe/tasks-vision/package.json'\\); console.log\\('version:', pkg.version\\); console.log\\('types:', pkg.types || pkg.typings || 'none'\\);\")",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}, indent=2\\)\\)\")"
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}, indent=2\\)\\)\")",
+      "Bash(Test-Path README.md)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Skill(vercel:deploy)",
+      "Bash(vercel --version)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\alias\\\\OneDrive\\\\AI Projects\\\\GaitPrecision\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\alias\\\\OneDrive\\\\AI Projects\\\\GaitPrecision\" -Recurse -Force)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(node -e \"const p = require\\('./node_modules/lucide-react/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(node -e \"const lr = require\\('./node_modules/lucide-react'\\); console.log\\('PersonStanding' in lr, 'Footprints' in lr\\)\")",
+      "Bash(node *)",
+      "Bash(del *)"
     ]
   }
 }

@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useGaitAnalyzer } from '../hooks/useGaitAnalyzer';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/src/lib/utils';
-import { saveSession, scoreFromAngles, statusFromScore, labelFromScore, type GaitSession } from '@/src/lib/sessionDb';
+import { saveSession, scoreFromAngles, type GaitSession } from '@/src/lib/sessionDb';
+import { getNormsFromProfile } from '@/src/lib/normativeRanges';
+import { getAgeGroup, AGE_GROUP_LABELS, BENCHMARKS } from '@/src/lib/userProfile';
 
 interface WellnessDashboardProps {
   videoSrc?: string | null;
@@ -41,7 +43,7 @@ function fallRisk(asymmetry: number, cadence: number, score: number): { level: '
 }
 
 export default function WellnessDashboard({ videoSrc }: WellnessDashboardProps) {
-  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis } = useGaitAnalyzer();
+  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis, getSessionData } = useGaitAnalyzer();
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -70,29 +72,32 @@ export default function WellnessDashboard({ videoSrc }: WellnessDashboardProps) 
     }
   }, [isReady, videoSrc, startAnalysis]);
 
-  const latestRef = useRef({ kneeAngles, hipAngles, ankleAngles, strideMetrics });
-  latestRef.current = { kneeAngles, hipAngles, ankleAngles, strideMetrics };
+  const strideRef = useRef(strideMetrics);
+  strideRef.current = strideMetrics;
 
   const wasProcessingRef = useRef(false);
   useEffect(() => {
     const justFinished = wasProcessingRef.current && !isProcessing;
     wasProcessingRef.current = isProcessing;
-    const { kneeAngles, hipAngles, ankleAngles, strideMetrics } = latestRef.current;
-    if (!justFinished || !kneeAngles.left.length || !videoRef.current?.ended) return;
+    if (!justFinished || !videoRef.current?.ended) return;
+
+    const { kneeAngles, hipAngles, ankleAngles } = getSessionData();
+    if (!kneeAngles.left.length) return;
+
     const s = scoreFromAngles(kneeAngles);
+    const now = new Date();
     const session: GaitSession = {
       id: `SES-${Date.now()}`,
       date: Date.now(),
       duration: Math.round(videoRef.current.duration),
-      label: labelFromScore(s),
+      label: `Session ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`,
       kneeAngles, hipAngles, ankleAngles,
       frameCount: kneeAngles.left.length,
       score: s,
-      status: statusFromScore(s),
-      stride: strideMetrics,
+      stride: strideRef.current,
     };
     saveSession(session).catch(console.error);
-  }, [isProcessing]);
+  }, [isProcessing, getSessionData]);
 
   useEffect(() => {
     const ro = new ResizeObserver(() => {
@@ -110,6 +115,11 @@ export default function WellnessDashboard({ videoSrc }: WellnessDashboardProps) 
   const cadence = cadenceLabel(strideMetrics.cadence);
   const risk = fallRisk(asymmetry, strideMetrics.cadence, score);
   const hasData = kneeAngles.left.length > 0;
+
+  const ageGroup = getAgeGroup();
+  const norms = getNormsFromProfile();
+  const ageLabel = ageGroup ? AGE_GROUP_LABELS[ageGroup] : null;
+  const ageBenchmark = ageGroup ? BENCHMARKS[ageGroup] : null;
 
   if (isLoading) {
     return (
@@ -255,6 +265,11 @@ export default function WellnessDashboard({ videoSrc }: WellnessDashboardProps) 
                 <p className="text-sm text-on-surface-variant mt-1">
                   {hasData ? 'Based on your knee and hip movement' : 'Score will appear once analysis starts'}
                 </p>
+                {ageBenchmark && (
+                  <p className="text-xs text-on-surface-variant/60 mt-1.5">
+                    Typical for {ageLabel}: ≥{ageBenchmark.score}
+                  </p>
+                )}
               </div>
             </div>
           </motion.div>
@@ -322,6 +337,11 @@ export default function WellnessDashboard({ videoSrc }: WellnessDashboardProps) 
               {strideMetrics.cadence > 0 && <span className="text-sm text-on-surface-variant">steps / min</span>}
             </div>
             <p className="text-sm text-on-surface-variant leading-relaxed">{cadence.detail}</p>
+            <p className="text-xs text-on-surface-variant/60 mt-2">
+              {ageLabel
+                ? `Norm (${ageLabel}): ${norms.cadence.mean} ± ${norms.cadence.sd} spm · ${norms.cadence.source}`
+                : `Population norm: ${norms.cadence.mean} ± ${norms.cadence.sd} spm · ${norms.cadence.source}`}
+            </p>
           </motion.div>
 
           {/* Fall Risk */}

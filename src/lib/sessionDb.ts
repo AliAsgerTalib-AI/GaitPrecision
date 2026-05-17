@@ -1,7 +1,16 @@
 export interface LegStrideMetrics {
   stancePercent: number;
   swingPercent: number;
-  strideTime: number;  // seconds
+  strideTime: number;       // seconds
+  stanceEstimated?: boolean; // true when no toe-off events were detected; value is population default
+}
+
+// One complete gait cycle (heel-strike → heel-strike), resampled to exactly 100 points.
+export interface NormalizedCycle {
+  angles: number[];    // knee flexion at 0–100% of the gait cycle
+  peakAngle: number;   // maximum flexion during swing (degrees)
+  peakAt: number;      // % of cycle where peak occurs (0–100)
+  stancePct: number;   // stance phase as % of cycle (0 if toe-off not detected)
 }
 
 export interface StrideMetrics {
@@ -19,8 +28,7 @@ export interface GaitSession {
   hipAngles?: { left: number[]; right: number[] };
   ankleAngles?: { left: number[]; right: number[] };
   frameCount: number;
-  score: number;                             // 0–100
-  status: 'Stable' | 'Improved' | 'Critical';
+  score: number;                             // 0–100 symmetry index
   stride?: StrideMetrics;
 }
 
@@ -61,20 +69,29 @@ export async function loadSessions(): Promise<GaitSession[]> {
   });
 }
 
+// Symmetry score using the Robinson (1987) Symmetry Index applied to two
+// clinically meaningful features: Range of Motion and Mean Flexion.
+// SI = |left − right| / ((left + right) / 2) × 100 → 0% = perfect symmetry.
+// Each feature contributes 50% of the final score.
 export function scoreFromAngles(angles: { left: number[]; right: number[] }): number {
-  if (!angles.left.length) return 0;
-  const diffs = angles.left.map((l, i) => Math.abs(l - (angles.right[i] ?? l)));
-  return Math.round(Math.max(0, Math.min(100, 100 - mean(diffs) * 2)));
-}
+  const { left, right } = angles;
+  if (!left.length || !right.length) return 0;
 
-export function statusFromScore(score: number): GaitSession['status'] {
-  return score >= 85 ? 'Stable' : score >= 70 ? 'Improved' : 'Critical';
-}
+  const romLeft  = Math.max(...left)  - Math.min(...left);
+  const romRight = Math.max(...right) - Math.min(...right);
+  const romAvg   = (romLeft + romRight) / 2;
 
-export function labelFromScore(score: number): string {
-  return score >= 85
-    ? 'Standard Gait Protocol'
-    : score >= 70
-    ? 'Monitoring Protocol'
-    : 'Critical Alert Protocol';
+  const meanLeft  = mean(left);
+  const meanRight = mean(right);
+  const meanAvg   = (meanLeft + meanRight) / 2;
+
+  // SI as % asymmetry (0 = identical, 100 = completely different)
+  const romSI  = romAvg  > 0 ? (Math.abs(romLeft  - romRight)  / romAvg)  * 100 : 0;
+  const meanSI = meanAvg > 0 ? (Math.abs(meanLeft - meanRight) / meanAvg) * 100 : 0;
+
+  // Each 1% SI asymmetry deducts 3 points; 33% asymmetry → 0 score
+  const romScore  = Math.max(0, 100 - romSI  * 3);
+  const meanScore = Math.max(0, 100 - meanSI * 3);
+
+  return Math.round((romScore + meanScore) / 2);
 }

@@ -27,7 +27,7 @@ Patient data:
 - Right knee mean flexion: ${rMean.toFixed(1)}°
 - Bilateral asymmetry: ${asym}°
 - Left ROM: ${lROM}°, Right ROM: ${rROM}°
-- Symmetry score: ${session.score}/100 (${session.status})
+- Symmetry score: ${session.score}/100
 - Duration: ${session.duration}s, frames analyzed: ${session.frameCount}
 - Protocol: ${session.label}
 

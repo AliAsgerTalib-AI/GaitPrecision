@@ -27,7 +27,7 @@ function drawHeader(doc: jsPDF, session: GaitSession, page: number, total: numbe
   doc.text('Clinical Gait Analysis Report', 10, 16.5);
 
   doc.text(
-    `${session.id}  ·  ${fmtDate(session.date)}  ·  Score ${session.score}/100  ·  ${session.status}`,
+    `${session.id}  ·  ${fmtDate(session.date)}  ·  Score ${session.score}/100`,
     W - 10, 10.5,
     { align: 'right' },
   );

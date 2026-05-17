@@ -1,10 +1,13 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Video, VideoOff, Square, RefreshCcw, CheckCircle2, ShieldCheck, Cpu, AlertCircle } from 'lucide-react';
+import { Video, Square, RefreshCcw, CheckCircle2, ShieldCheck, Cpu, AlertCircle, Circle, PersonStanding, Dumbbell, Weight, Zap } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { useCameraSetup, type SetupChecks } from '@/src/hooks/useCameraSetup';
+
+export type ActivityType = 'gait' | 'stair' | 'squat' | 'lift' | 'balance' | 'exercise';
 
 interface RecorderProps {
-  onComplete: (videoBlob: Blob) => void;
+  onComplete: (videoBlob: Blob, type: ActivityType) => void;
   onCancel: () => void;
 }
 
@@ -13,12 +16,17 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const [activityType, setActivityType] = useState<ActivityType>('gait');
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [setupDone, setSetupDone] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [hasRecordedData, setHasRecordedData] = useState(false);
   const [error, setError] = useState<{ title: string; message: string; type: 'permission' | 'device' | 'hardware' | 'unknown' } | null>(null);
   const [duration, setDuration] = useState(0);
   const timerRef = useRef<number | null>(null);
+
+  // Camera setup validation only runs for gait/stair modes (side-on view). Balance uses a frontal view.
+  const { isReady: setupReady, checks, allPassed } = useCameraSetup(videoRef, !!stream && !setupDone && activityType !== 'balance' && activityType !== 'exercise');
 
   const setupCamera = async () => {
     try {
@@ -119,7 +127,7 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
 
   const finalizeRecording = () => {
     const finalBlob = new Blob(chunksRef.current, { type: 'video/webm' });
-    onComplete(finalBlob);
+    onComplete(finalBlob, activityType);
   };
 
   const formatTime = (seconds: number) => {
@@ -142,14 +150,38 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
           </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-6">
-          <div className="flex items-center gap-2 px-3 py-1 bg-primary/5 border border-primary/20 rounded-lg">
-            <Cpu className="w-3 h-3 text-primary" />
-            <span className="font-mono text-[10px] text-primary uppercase tracking-widest font-bold">WASM_ACCEL_ON</span>
+        <div className="flex items-center gap-3">
+          {/* Activity type toggle */}
+          <div className="flex rounded-lg border border-outline-variant overflow-hidden">
+            {(
+              [
+                { type: 'gait',    icon: <Cpu className="w-3 h-3" />,                      label: 'Gait',    setup: false },
+                { type: 'stair',   icon: <PersonStanding className="w-3 h-3" />,           label: 'Stairs',  setup: false },
+                { type: 'squat',   icon: <Dumbbell className="w-3 h-3" />,                 label: 'Squat',   setup: false },
+                { type: 'lift',    icon: <Weight className="w-3 h-3" />,                   label: 'Lifting', setup: false },
+                { type: 'balance',  icon: <PersonStanding className="w-3 h-3 rotate-12" />, label: 'Balance',   setup: true  },
+                { type: 'exercise', icon: <Zap className="w-3 h-3" />,                      label: 'Exercises', setup: false },
+              ] as { type: ActivityType; icon: React.ReactNode; label: string; setup: boolean }[]
+            ).map(({ type, icon, label, setup }, i, arr) => (
+              <button
+                key={type}
+                onClick={() => { setActivityType(type); setSetupDone(setup); }}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1.5 font-mono text-[9px] font-bold uppercase tracking-widest transition-all',
+                  i > 0 && i < arr.length && 'border-l border-outline-variant',
+                  activityType === type
+                    ? 'bg-primary text-on-primary'
+                    : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high',
+                )}
+              >
+                {icon} {label}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-2 px-3 py-1 bg-surface-container-high border border-outline-variant rounded-lg">
+
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-surface-container-high border border-outline-variant rounded-lg">
             <ShieldCheck className="w-3 h-3 text-secondary" />
-            <span className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">Encrypted Stream</span>
+            <span className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">On-Device</span>
           </div>
         </div>
 
@@ -198,6 +230,72 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
               )}
             />
             
+            {/* ── Camera setup guide overlays ─────────────────────────────── */}
+            <AnimatePresence>
+              {!setupDone && stream && activityType !== 'balance' && activityType !== 'exercise' && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 pointer-events-none z-20"
+                >
+                  {/* Corridor — vertical zone */}
+                  <div className="absolute inset-y-0 border-l border-r border-primary/20" style={{ left: '25%', right: '25%' }}>
+                    <span className="absolute top-4 left-1/2 -translate-x-1/2 font-mono text-[8px] text-primary/50 uppercase tracking-widest whitespace-nowrap">
+                      {activityType === 'stair' ? 'climb stairs here' : activityType === 'squat' ? 'stand and squat here' : activityType === 'lift' ? 'perform lift here' : 'walk through here'}
+                    </span>
+                  </div>
+                  <div className="absolute left-0 right-0 border-t border-dashed border-primary/20" style={{ top: '10%' }}>
+                    <span className="absolute right-3 top-1 font-mono text-[8px] text-primary/40 uppercase tracking-widest">head clearance</span>
+                  </div>
+                  <div className="absolute left-0 right-0 border-t-2 border-dashed border-primary/70" style={{ top: '52%' }}>
+                    <span className="absolute left-3 -top-5 font-mono text-[9px] text-primary font-bold uppercase tracking-widest bg-surface/60 px-2 py-0.5 rounded">
+                      ← align hips here
+                    </span>
+                    <span className="absolute right-3 -top-5 font-mono text-[9px] text-primary/60 uppercase tracking-widest bg-surface/60 px-2 py-0.5 rounded">
+                      ~3 m / 10 ft
+                    </span>
+                  </div>
+                  <div className="absolute left-0 right-0 border-t border-dashed border-primary/20" style={{ top: '90%' }}>
+                    <span className="absolute right-3 top-1 font-mono text-[8px] text-primary/40 uppercase tracking-widest">foot clearance</span>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Balance / Exercise mode — frontal view guide */}
+              {stream && (activityType === 'balance' || activityType === 'exercise') && !isRecording && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 pointer-events-none z-20"
+                >
+                  {/* Center column — stand here */}
+                  <div className="absolute inset-y-0 border-l border-r border-primary/30" style={{ left: '35%', right: '35%' }}>
+                    <span className="absolute top-4 left-1/2 -translate-x-1/2 font-mono text-[8px] text-primary/60 uppercase tracking-widest whitespace-nowrap">stand here</span>
+                  </div>
+                  {/* Head clearance */}
+                  <div className="absolute left-0 right-0 border-t border-dashed border-primary/20" style={{ top: '8%' }}>
+                    <span className="absolute right-3 top-1 font-mono text-[8px] text-primary/40 uppercase tracking-widest">head</span>
+                  </div>
+                  {/* Hip line */}
+                  <div className="absolute left-0 right-0 border-t border-dashed border-primary/40" style={{ top: '50%' }}>
+                    <span className="absolute left-3 top-1 font-mono text-[8px] text-primary/50 uppercase tracking-widest">hip midpoint</span>
+                  </div>
+                  {/* Feet line */}
+                  <div className="absolute left-0 right-0 border-t border-dashed border-primary/20" style={{ top: '92%' }}>
+                    <span className="absolute right-3 top-1 font-mono text-[8px] text-primary/40 uppercase tracking-widest">feet</span>
+                  </div>
+                  {/* Instruction badge */}
+                  <div className="absolute bottom-28 left-1/2 -translate-x-1/2 bg-surface/80 backdrop-blur-sm border border-primary/30 rounded-xl px-4 py-2 whitespace-nowrap">
+                    <p className="font-mono text-[9px] text-primary uppercase tracking-widest font-bold">
+                      {activityType === 'exercise' ? 'Face camera · Full body · ~2 m away' : 'Face camera · Full body in frame · ~2 m away'}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* HUD Overlay */}
             <div className="absolute inset-0 pointer-events-none p-4 sm:p-12 flex flex-col justify-between">
               {/* Corner Accents */}
@@ -259,7 +357,85 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
       </div>
 
       {/* Control Bar */}
-      <div className="bg-surface-container-low border-t border-outline-variant px-4 sm:px-8 flex items-center justify-center gap-8 relative" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)', minHeight: '8rem' }}>
+      <div className="bg-surface-container-low border-t border-outline-variant px-4 sm:px-8 relative" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <AnimatePresence mode="wait">
+
+          {/* ── Setup checklist ────────────────────────────────────────────── */}
+          {!setupDone && stream && activityType !== 'balance' && activityType !== 'exercise' && (
+            <motion.div
+              key="setup"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="py-5 space-y-4"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <p className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">
+                  {setupReady ? 'Camera Setup Validation' : 'Loading detection engine…'}
+                </p>
+                <span className={cn(
+                  'font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded',
+                  allPassed ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface-variant'
+                )}>
+                  {Object.values(checks).filter(Boolean).length}/4 passed
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { key: 'legsVisible',   label: 'Full leg visible',  detail: 'Both legs must be in frame' },
+                    { key: 'cameraLevel',   label: 'Camera level',      detail: 'No lateral tilt' },
+                    { key: 'cameraHeight',  label: 'Camera height',     detail: 'Align lens with subject\'s hips' },
+                    { key: 'distance',      label: 'Subject distance',  detail: '~3 m / 10 ft from camera' },
+                  ] as { key: keyof SetupChecks; label: string; detail: string }[]
+                ).map(({ key, label, detail }) => {
+                  const passed = checks[key];
+                  return (
+                    <div key={key} className={cn(
+                      'flex items-start gap-3 px-3 py-2.5 rounded-xl border transition-all',
+                      passed
+                        ? 'bg-primary/8 border-primary/25 text-primary'
+                        : 'bg-surface-container border-outline-variant text-on-surface-variant'
+                    )}>
+                      {passed
+                        ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        : <Circle className="w-3.5 h-3.5 shrink-0 mt-0.5 opacity-30" />
+                      }
+                      <div>
+                        <p className="font-mono text-[9px] font-bold uppercase tracking-widest leading-none">{label}</p>
+                        <p className="font-mono text-[8px] opacity-60 mt-0.5">{detail}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setSetupDone(true)}
+                disabled={!allPassed}
+                className={cn(
+                  'w-full py-4 rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest transition-all',
+                  allPassed
+                    ? 'bg-primary text-on-primary hover:opacity-90 shadow-lg shadow-primary/20'
+                    : 'bg-surface-container border border-outline-variant text-on-surface-variant opacity-50 cursor-not-allowed'
+                )}
+              >
+                {allPassed ? 'Setup Confirmed — Start Recording' : 'Adjust camera to continue'}
+              </button>
+
+              <button
+                onClick={() => setSetupDone(true)}
+                className="w-full text-center font-mono text-[9px] text-on-surface-variant uppercase tracking-widest opacity-40 hover:opacity-70 transition-opacity pb-1"
+              >
+                Skip setup (data quality may be reduced)
+              </button>
+            </motion.div>
+          )}
+
+          {/* ── Recording controls (existing) ────────────────────────────── */}
+          {(setupDone || !stream) && (
+        <div className="flex items-center justify-center gap-8 min-h-[8rem]">
         <AnimatePresence mode="wait">
           {!isRecording && !hasRecordedData ? (
             <motion.button
@@ -314,18 +490,22 @@ export default function Recorder({ onComplete, onCancel }: RecorderProps) {
             </motion.div>
           )}
         </AnimatePresence>
-        
+
         {isRecording && (
           <div className="absolute right-12 top-1/2 -translate-y-1/2 flex items-center gap-3">
-             <div className="flex flex-col items-end">
-               <span className="font-mono text-[10px] text-on-surface-variant uppercase font-bold">Buffer Status</span>
-               <span className="font-mono text-xs text-primary font-bold">LIVE_OPTIMAL</span>
-             </div>
-             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Video className="w-5 h-5 text-primary" />
-             </div>
+            <div className="flex flex-col items-end">
+              <span className="font-mono text-[10px] text-on-surface-variant uppercase font-bold">Buffer Status</span>
+              <span className="font-mono text-xs text-primary font-bold">LIVE_OPTIMAL</span>
+            </div>
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Video className="w-5 h-5 text-primary" />
+            </div>
           </div>
         )}
+        </div>
+          )}
+
+        </AnimatePresence>
       </div>
     </div>
   );

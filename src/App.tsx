@@ -2,10 +2,15 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import Navigation from './components/Navigation';
 import Hero from './components/Hero';
 import Dashboard from './components/Dashboard';
+import BalanceDashboard from './components/BalanceDashboard';
+import StairDashboard from './components/StairDashboard';
+import SquatDashboard from './components/SquatDashboard';
+import LiftDashboard from './components/LiftDashboard';
+import ExerciseDashboard from './components/ExerciseDashboard';
 import Report from './components/Report';
 import Profile from './components/Profile';
 import SymmetryComparison from './components/SymmetryComparison';
-import Recorder from './components/Recorder';
+import Recorder, { type ActivityType } from './components/Recorder';
 import HowToRecord from './components/HowToRecord';
 import WellnessHome from './components/WellnessHome';
 import WellnessDashboard from './components/WellnessDashboard';
@@ -19,6 +24,7 @@ function AppInner() {
   const { mode } = useMode();
   const [currentView, setCurrentView] = useState<View>('home');
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [activityType, setActivityType] = useState<ActivityType>('gait');
   const prevVideoSrc = useRef<string | null>(null);
 
   // Revoke the previous object URL when a new one replaces it.
@@ -50,7 +56,8 @@ function AppInner() {
       case 'recording':
         return (
           <Recorder
-            onComplete={(blob) => {
+            onComplete={(blob, type) => {
+              setActivityType(type);
               setVideo(blob);
               setCurrentView('dashboard');
             }}
@@ -58,6 +65,11 @@ function AppInner() {
           />
         );
       case 'dashboard':
+        if (activityType === 'balance') return <BalanceDashboard videoSrc={videoSrc} />;
+        if (activityType === 'stair')   return <StairDashboard videoSrc={videoSrc} />;
+        if (activityType === 'squat')   return <SquatDashboard videoSrc={videoSrc} />;
+        if (activityType === 'lift')     return <LiftDashboard videoSrc={videoSrc} />;
+        if (activityType === 'exercise') return <ExerciseDashboard videoSrc={videoSrc} />;
         return mode === 'wellness'
           ? <WellnessDashboard videoSrc={videoSrc} />
           : <Dashboard videoSrc={videoSrc} />;
@@ -75,7 +87,7 @@ function AppInner() {
       case 'help':
         return <HowToRecord />;
     }
-  }, [currentView, videoSrc, setVideo]);
+  }, [currentView, videoSrc, setVideo, activityType, mode]);
 
   return (
     <div className="min-h-screen bg-surface selection:bg-primary/20 selection:text-primary pb-16 md:pb-0">

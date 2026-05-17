@@ -1,17 +1,17 @@
-import { Play, SkipBack, SkipForward, Maximize2, Radio, Activity, Waves, Plus, AlertCircle } from 'lucide-react';
+import { Play, SkipBack, SkipForward, Maximize2, Radio, Activity, Waves, Plus, AlertCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import AnalysisSettings from './AnalysisSettings';
 import { useGaitAnalyzer } from '../hooks/useGaitAnalyzer';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/src/lib/utils';
-import { saveSession, scoreFromAngles, statusFromScore, labelFromScore, type GaitSession } from '@/src/lib/sessionDb';
+import { saveSession, scoreFromAngles, type GaitSession } from '@/src/lib/sessionDb';
 
 interface DashboardProps {
   videoSrc?: string | null;
 }
 
 export default function Dashboard({ videoSrc }: DashboardProps) {
-  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis } = useGaitAnalyzer();
+  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis, getSessionData, visibilityWarning } = useGaitAnalyzer();
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -45,34 +45,37 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
     }
   }, [isReady, videoSrc, startAnalysis]);
 
-  // Keep a stable ref to the latest angle/metric values so the save effect
-  // only needs to depend on isProcessing, not the per-frame state objects.
-  const latestRef = useRef({ kneeAngles, hipAngles, ankleAngles, strideMetrics });
-  latestRef.current = { kneeAngles, hipAngles, ankleAngles, strideMetrics };
+  // Keep a stable ref to strideMetrics so the save effect doesn't depend on
+  // per-frame state — angle data is read directly from the full accumulators.
+  const strideRef = useRef(strideMetrics);
+  strideRef.current = strideMetrics;
 
   const wasProcessingRef = useRef(false);
   useEffect(() => {
     const justFinished = wasProcessingRef.current && !isProcessing;
     wasProcessingRef.current = isProcessing;
-    const { kneeAngles, hipAngles, ankleAngles, strideMetrics } = latestRef.current;
-    if (!justFinished || !kneeAngles.left.length || !videoRef.current?.ended) return;
+    if (!justFinished || !videoRef.current?.ended) return;
+
+    const { kneeAngles, hipAngles, ankleAngles } = getSessionData();
+    if (!kneeAngles.left.length) return;
 
     const score = scoreFromAngles(kneeAngles);
+    const now = new Date();
+    const label = `Session ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
     const session: GaitSession = {
       id: `SES-${Date.now()}`,
       date: Date.now(),
       duration: Math.round(videoRef.current.duration),
-      label: labelFromScore(score),
+      label,
       kneeAngles,
       hipAngles,
       ankleAngles,
       frameCount: kneeAngles.left.length,
       score,
-      status: statusFromScore(score),
-      stride: strideMetrics,
+      stride: strideRef.current,
     };
     saveSession(session).catch(console.error);
-  }, [isProcessing]);
+  }, [isProcessing, getSessionData]);
 
   // Handle canvas sizing to match video aspect ratio
   useEffect(() => {
@@ -187,6 +190,23 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
                     Telemetry_Feed: <span className={cn(isProcessing ? "text-primary" : "text-on-surface-variant")}>Active</span>
                   </div>
                 </div>
+
+                {/* Leg visibility warning — overlaid on the video feed */}
+                <AnimatePresence>
+                  {visibilityWarning && isProcessing && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      className="absolute top-16 left-6 right-6 z-20 flex items-center gap-3 px-4 py-2.5 bg-[#f59e0b]/90 backdrop-blur-sm rounded-xl border border-[#f59e0b]/60 shadow-lg"
+                    >
+                      <AlertTriangle className="w-4 h-4 text-surface-container shrink-0" />
+                      <p className="font-mono text-[10px] font-bold text-surface-container uppercase tracking-widest leading-relaxed">
+                        Leg not visible — angle data paused. Ensure the full leg is in frame with a clear side-on view.
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
 
@@ -282,13 +302,37 @@ export default function Dashboard({ videoSrc }: DashboardProps) {
                 </div>
               </div>
             ) : (
-              <div className="h-20 w-full flex items-center gap-1 rounded-2xl overflow-hidden border border-outline-variant bg-surface-container-low p-1.5 shadow-inner">
-                <div className="h-full bg-primary/40 border-r border-primary/20 w-1/4 flex items-center justify-center font-mono text-[10px] font-bold text-primary rounded-l-xl">STANCE 62%</div>
-                <div className="h-full bg-primary/5 border-r border-primary/10 w-[15%] flex items-center justify-center font-mono text-[10px] font-bold opacity-60">SWING 38%</div>
-                <div className="h-full bg-primary/40 border-r border-primary/20 w-1/3 flex items-center justify-center font-mono text-[10px] font-bold text-primary">STANCE 61%</div>
-                <div className="h-full bg-primary/20 grow flex items-center justify-center font-mono text-[10px] font-bold italic opacity-60 rounded-r-xl">
+              <div className="h-20 w-full flex items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-low shadow-inner">
+                <span className="font-mono text-[10px] font-bold italic opacity-40 uppercase tracking-widest">
                   {isProcessing ? 'DETECTING...' : 'AWAITING DATA'}
-                </div>
+                </span>
+              </div>
+            )}
+
+            {isProcessing &&
+              strideMetrics.left.strideTime === 0 &&
+              strideMetrics.right.strideTime === 0 &&
+              kneeAngles.left.length >= 30 && (
+              <div className="mt-4 flex items-start gap-3 px-4 py-3 bg-[#f59e0b]/8 border border-[#f59e0b]/25 rounded-xl">
+                <AlertTriangle className="w-3.5 h-3.5 text-[#f59e0b] shrink-0 mt-0.5" />
+                <p className="font-mono text-[10px] text-[#f59e0b] leading-relaxed">
+                  <span className="font-bold uppercase tracking-widest">No heel strikes detected — </span>
+                  knee angle has not crossed the 155° threshold. Cadence and stance/swing data will not be computed.
+                  Check that the full leg is visible side-on and the subject is walking, not standing still.
+                </p>
+              </div>
+            )}
+
+            {(strideMetrics.left.stanceEstimated || strideMetrics.right.stanceEstimated) && (
+              strideMetrics.left.strideTime > 0 || strideMetrics.right.strideTime > 0
+            ) && (
+              <div className="mt-4 flex items-start gap-3 px-4 py-3 bg-[#f59e0b]/8 border border-[#f59e0b]/25 rounded-xl">
+                <AlertTriangle className="w-3.5 h-3.5 text-[#f59e0b] shrink-0 mt-0.5" />
+                <p className="font-mono text-[10px] text-[#f59e0b] leading-relaxed">
+                  <span className="font-bold uppercase tracking-widest">Stance % estimated — </span>
+                  toe-off events not detected (knee angle did not cross the 140° threshold).
+                  Showing population default (62/38). Ensure the camera has a clear side-on view of the full leg.
+                </p>
               </div>
             )}
 
