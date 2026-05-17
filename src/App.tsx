@@ -12,13 +12,14 @@ import Profile from './components/Profile';
 import SymmetryComparison from './components/SymmetryComparison';
 import Recorder, { type ActivityType } from './components/Recorder';
 import HowToRecord from './components/HowToRecord';
+import Glossary from './components/Glossary';
 import WellnessHome from './components/WellnessHome';
 import WellnessDashboard from './components/WellnessDashboard';
 import WellnessReport from './components/WellnessReport';
 import { ModeProvider, useMode } from './lib/modeContext';
 import { motion, AnimatePresence } from 'motion/react';
 
-type View = 'home' | 'dashboard' | 'report' | 'recording' | 'profile' | 'help';
+type View = 'home' | 'dashboard' | 'report' | 'recording' | 'profile' | 'help' | 'glossary';
 
 function AppInner() {
   const { mode } = useMode();
@@ -51,6 +52,7 @@ function AppInner() {
           <Hero
             onStartAnalysis={(type) => { setActivityType(type); setCurrentView('recording'); }}
             onUploadComplete={(file) => { setVideo(file); setCurrentView('dashboard'); }}
+            onHome={() => setCurrentView('home')}
           />
         );
       case 'recording':
@@ -92,6 +94,8 @@ function AppInner() {
         return <Profile />;
       case 'help':
         return <HowToRecord />;
+      case 'glossary':
+        return <Glossary />;
     }
   }, [currentView, videoSrc, setVideo, activityType, mode]);
 
@@ -114,10 +118,26 @@ function AppInner() {
       </main>
 
       <footer className="bg-surface-container-lowest border-t border-outline-variant mt-20">
-        <div className="border-t border-outline-variant/30 py-6 text-center">
-          <p className="font-mono text-[9px] text-on-surface-variant uppercase tracking-[0.2em] opacity-60">
-            © 2026 GaitPrecision. Built with WASM & WebAssembly. All biometric data remains on-device.
-          </p>
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 py-10 flex flex-col items-center gap-6 text-center">
+          <button onClick={() => setCurrentView('home')} className="focus:outline-none" aria-label="Go to home">
+            <img src="/logo.png" alt="Symphery" className="h-12 w-auto opacity-70 hover:opacity-100 transition-opacity" />
+          </button>
+
+          <div className="max-w-2xl space-y-2">
+            <p className="font-sans text-[11px] text-on-surface-variant/70 leading-relaxed">
+              <span className="font-semibold text-on-surface-variant">Legal Disclaimer:</span> GaitPrecision is intended for informational and research purposes only. It does not constitute medical advice, diagnosis, or treatment. Always consult a qualified healthcare professional before making any clinical decisions based on this tool. All biomechanical data is processed locally on your device and never transmitted to external servers.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-6 text-[10px] font-mono text-on-surface-variant/50 uppercase tracking-widest">
+            <span>© 2026 Symphery</span>
+            <span className="hidden sm:inline opacity-30">|</span>
+            <a href="mailto:aliasgertalib@gmail.com" className="hover:text-primary transition-colors">
+              aliasgertalib@gmail.com
+            </a>
+            <span className="hidden sm:inline opacity-30">|</span>
+            <span>All biometric data remains on-device</span>
+          </div>
         </div>
       </footer>
     </div>

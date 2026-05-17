@@ -25,7 +25,9 @@
       "Bash(ls server*)",
       "Bash(npx tsc *)",
       "PowerShell($key = [System.Environment]::GetEnvironmentVariable\\(\"GEMINI_API_KEY\"\\); if \\($key\\) { \"Key found: $\\($key.Substring\\(0,8\\)\\)...\" } else { \"Not set\" })",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\alias\\\\OneDrive\\\\AI Projects\\\\GaitPrecision\\\\src\" -Recurse -File)",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

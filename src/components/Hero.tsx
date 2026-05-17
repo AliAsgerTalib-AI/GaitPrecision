@@ -18,6 +18,7 @@ import type { ActivityType } from "./Recorder";
 interface HeroProps {
   onStartAnalysis: (type: ActivityType) => void;
   onUploadComplete: (file: File) => void;
+  onHome: () => void;
 }
 
 const MODES: {
@@ -64,7 +65,11 @@ const MODES: {
   },
 ];
 
-export default function Hero({ onStartAnalysis, onUploadComplete }: HeroProps) {
+export default function Hero({
+  onStartAnalysis,
+  onUploadComplete,
+  onHome,
+}: HeroProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -90,28 +95,20 @@ export default function Hero({ onStartAnalysis, onUploadComplete }: HeroProps) {
   return (
     <div className="pt-20 sm:pt-24 min-h-screen">
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col items-center text-center">
-        <motion.h1
+        <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="font-display text-4xl sm:text-5xl md:text-6xl text-on-surface max-w-4xl mb-4 sm:mb-6 leading-[1.1] "
+          transition={{ delay: 0.15 }}
+          className=" font-extrabold font-serif:text-xl text-on-surface-variant max-w-2xl mb-3  tracking-wide"
         >
           GaitPrecision
-        </motion.h1>
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="font-sans text-base sm:text-xl text-on-surface-variant max-w-2xl mb-10 sm:mb-14 tracking-tight"
-        >
-          Clinical Movement Analysis
-        </motion.h1>
+        </motion.p>
 
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="font-sans text-base sm:text-xl text-on-surface-variant max-w-2xl mb-10 sm:mb-14 tracking-tight"
+          className="font-sans text-sm sm:text-base text-on-surface-variant/60 max-w-2xl mb-10 sm:mb-14 tracking-tight"
         >
           Real-time Biomechanical Assessment
         </motion.p>

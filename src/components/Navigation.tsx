@@ -1,8 +1,18 @@
-import { ShieldCheck, Home, Activity, ScrollText, User, HelpCircle, Heart, FlaskConical } from 'lucide-react';
-import { cn } from '@/src/lib/utils';
-import { useMode } from '@/src/lib/modeContext';
+import {
+  ShieldCheck,
+  Home,
+  Activity,
+  ScrollText,
+  User,
+  HelpCircle,
+  Heart,
+  FlaskConical,
+  BookOpen,
+} from "lucide-react";
+import { cn } from "@/src/lib/utils";
+import { useMode } from "@/src/lib/modeContext";
 
-type View = 'home' | 'dashboard' | 'report' | 'recording' | 'profile' | 'help';
+type View = "home" | "dashboard" | "report" | "recording" | "profile" | "help" | "glossary";
 
 interface NavigationProps {
   currentView: View;
@@ -10,16 +20,45 @@ interface NavigationProps {
 }
 
 const navItems = [
-  { id: 'home' as const, label: 'Technology', mobileLabel: 'Home', Icon: Home },
-  { id: 'dashboard' as const, label: 'Dashboard', mobileLabel: 'Analysis', Icon: Activity },
-  { id: 'report' as const, label: 'Reports', mobileLabel: 'Reports', Icon: ScrollText },
-  { id: 'profile' as const, label: 'Profile', mobileLabel: 'Profile', Icon: User },
-  { id: 'help' as const, label: 'How to Record', mobileLabel: 'Help', Icon: HelpCircle },
+  { id: "home" as const, label: "Technology", mobileLabel: "Home", Icon: Home },
+  {
+    id: "dashboard" as const,
+    label: "Dashboard",
+    mobileLabel: "Analysis",
+    Icon: Activity,
+  },
+  {
+    id: "report" as const,
+    label: "Reports",
+    mobileLabel: "Reports",
+    Icon: ScrollText,
+  },
+  {
+    id: "profile" as const,
+    label: "Profile",
+    mobileLabel: "Profile",
+    Icon: User,
+  },
+  {
+    id: "help" as const,
+    label: "How to Record",
+    mobileLabel: "Help",
+    Icon: HelpCircle,
+  },
+  {
+    id: "glossary" as const,
+    label: "Glossary",
+    mobileLabel: "Glossary",
+    Icon: BookOpen,
+  },
 ];
 
-export default function Navigation({ currentView, onNavigate }: NavigationProps) {
+export default function Navigation({
+  currentView,
+  onNavigate,
+}: NavigationProps) {
   const { mode, toggle } = useMode();
-  if (currentView === 'recording') return null;
+  if (currentView === "recording") return null;
 
   return (
     <>
@@ -28,7 +67,7 @@ export default function Navigation({ currentView, onNavigate }: NavigationProps)
         <div className="flex justify-between items-center w-full px-4 sm:px-6 max-w-[1440px] mx-auto h-16">
           <div className="flex items-center gap-8">
             <button
-              onClick={() => onNavigate('home')}
+              onClick={() => onNavigate("home")}
               className="flex items-center gap-2 focus:outline-none"
               aria-label="Go to home"
             >
@@ -43,7 +82,7 @@ export default function Navigation({ currentView, onNavigate }: NavigationProps)
                     "font-mono text-xs uppercase tracking-wider transition-colors hover:text-primary",
                     currentView === item.id
                       ? "text-primary border-b-2 border-primary pb-1 font-bold"
-                      : "text-on-surface-variant font-medium"
+                      : "text-on-surface-variant font-medium",
                   )}
                 >
                   {item.label}
@@ -53,31 +92,32 @@ export default function Navigation({ currentView, onNavigate }: NavigationProps)
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-surface-container rounded-full border border-primary/20">
-              <span className="w-2 h-2 rounded-full bg-primary-container animate-pulse shadow-[0_0_8px_#2dd4bf]"></span>
-              <span className="font-mono text-[10px] text-primary uppercase tracking-widest">Local Processing Only</span>
-            </div>
-
             {/* Mode toggle */}
             <button
               onClick={toggle}
               className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all',
-                mode === 'wellness'
-                  ? 'bg-primary/10 border-primary/30 text-primary'
-                  : 'bg-surface-container border-outline-variant text-on-surface-variant hover:border-primary/40 hover:text-primary'
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all",
+                mode === "wellness"
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-surface-container border-outline-variant text-on-surface-variant hover:border-primary/40 hover:text-primary",
               )}
             >
-              {mode === 'wellness' ? <Heart className="w-3.5 h-3.5" /> : <FlaskConical className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{mode === 'wellness' ? 'Wellness' : 'Advanced'}</span>
+              {mode === "wellness" ? (
+                <Heart className="w-3.5 h-3.5" />
+              ) : (
+                <FlaskConical className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {mode === "wellness" ? "Wellness" : "Advanced"}
+              </span>
             </button>
 
             <button
               className="hidden sm:flex bg-primary text-on-primary px-4 py-2 rounded-lg font-mono text-xs font-bold items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-primary/10"
-              onClick={() => onNavigate('dashboard')}
+              onClick={() => onNavigate("dashboard")}
             >
               <ShieldCheck className="w-4 h-4" />
-              {mode === 'wellness' ? 'ANALYSE WALK' : 'SECURE ANALYSIS'}
+              {mode === "wellness" ? "ANALYSE WALK" : "SECURE ANALYSIS"}
             </button>
           </div>
         </div>
@@ -86,7 +126,7 @@ export default function Navigation({ currentView, onNavigate }: NavigationProps)
       {/* Mobile bottom tab bar */}
       <nav
         className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-md border-t border-outline-variant"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <div className="flex">
           {navItems.map((item) => (
@@ -95,7 +135,9 @@ export default function Navigation({ currentView, onNavigate }: NavigationProps)
               onClick={() => onNavigate(item.id)}
               className={cn(
                 "flex-1 flex flex-col items-center py-3 gap-1 transition-colors",
-                currentView === item.id ? "text-primary" : "text-on-surface-variant"
+                currentView === item.id
+                  ? "text-primary"
+                  : "text-on-surface-variant",
               )}
             >
               <item.Icon className="w-5 h-5" />
