@@ -1,4 +1,4 @@
-import { Play, Activity, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { Play, Activity, AlertTriangle, CheckCircle2, Info, Upload, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useGaitAnalyzer } from '../hooks/useGaitAnalyzer';
 import { useEffect, useRef, useState } from 'react';
@@ -9,6 +9,8 @@ import { getAgeGroup, AGE_GROUP_LABELS, BENCHMARKS } from '@/src/lib/userProfile
 
 interface WellnessDashboardProps {
   videoSrc?: string | null;
+  onRecord?: () => void;
+  onUpload?: (file: File) => void;
 }
 
 function wellnessLabel(score: number): { label: string; color: string; bg: string } {
@@ -42,10 +44,15 @@ function fallRisk(asymmetry: number, cadence: number, score: number): { level: '
   return { level: 'Low', color: 'text-primary', dot: 'bg-primary', advice: 'Your walking pattern suggests a low fall risk. Keep it up!' };
 }
 
-export default function WellnessDashboard({ videoSrc }: WellnessDashboardProps) {
+export default function WellnessDashboard({ videoSrc, onRecord, onUpload }: WellnessDashboardProps) {
   const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis, getSessionData } = useGaitAnalyzer();
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) { onUpload?.(file); e.target.value = ''; }
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 2000);
@@ -143,6 +150,7 @@ export default function WellnessDashboard({ videoSrc }: WellnessDashboardProps) 
             ref={containerRef}
             className="relative aspect-video bg-surface-container-low rounded-2xl overflow-hidden border border-outline-variant shadow-xl"
           >
+            <input ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileChange} />
             <video
               ref={videoRef}
               src={videoSrc ?? undefined}
@@ -155,13 +163,16 @@ export default function WellnessDashboard({ videoSrc }: WellnessDashboardProps) 
             />
 
             {!videoSrc && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-5">
-                <div className="w-16 h-16 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center">
-                  <Play className="w-7 h-7 text-on-surface-variant" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 z-5">
+                <p className="text-sm text-on-surface-variant opacity-60">No video loaded</p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button onClick={onRecord} className="flex items-center gap-2 px-5 py-2.5 bg-primary text-on-primary rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:opacity-90 transition-all shadow-lg shadow-primary/20">
+                    <Video className="w-4 h-4" /> Record Session
+                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-5 py-2.5 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-[10px] font-bold uppercase tracking-widest hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                    <Upload className="w-4 h-4" /> Upload Video
+                  </button>
                 </div>
-                <p className="text-sm text-on-surface-variant text-center px-8">
-                  No video loaded — record or upload a walk to get started
-                </p>
               </div>
             )}
 
@@ -170,6 +181,16 @@ export default function WellnessDashboard({ videoSrc }: WellnessDashboardProps) 
             {isProcessing && (
               <div className="absolute w-full h-0.5 bg-primary shadow-[0_0_20px_#57f1db] animate-scan z-20" />
             )}
+
+            {/* Record / upload actions */}
+            <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5">
+              <button onClick={() => fileInputRef.current?.click()} title="Upload video" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                <Upload className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={onRecord} title="Record new session" className="bg-surface/80 backdrop-blur-md border border-outline-variant/60 p-1.5 rounded-lg hover:border-primary/50 hover:text-primary text-on-surface-variant transition-all">
+                <Video className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
             {/* Minimal status */}
             <div className="absolute top-4 left-4 z-20">

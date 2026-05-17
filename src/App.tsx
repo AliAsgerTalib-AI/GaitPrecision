@@ -76,7 +76,7 @@ function AppInner() {
         if (activityType === 'lift')    return <LiftDashboard    videoSrc={videoSrc} {...dashProps} />;
         if (activityType === 'exercise') return <ExerciseDashboard videoSrc={videoSrc} {...dashProps} />;
         return mode === 'wellness'
-          ? <WellnessDashboard videoSrc={videoSrc} />
+          ? <WellnessDashboard videoSrc={videoSrc} {...dashProps} />
           : <Dashboard videoSrc={videoSrc} {...dashProps} />;
       }
       case 'report':
