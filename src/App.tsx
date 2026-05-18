@@ -71,6 +71,7 @@ function AppInner() {
         const dashProps = {
           onRecord: () => setCurrentView('recording'),
           onUpload: (file: File) => setVideo(file),
+          onOpenGlossary: () => setCurrentView('glossary'),
         };
         if (activityType === 'balance') return <BalanceDashboard videoSrc={videoSrc} {...dashProps} />;
         if (activityType === 'stair')   return <StairDashboard   videoSrc={videoSrc} {...dashProps} />;

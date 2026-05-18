@@ -1,4 +1,7 @@
-import { Play, Radio, Activity, Waves, AlertCircle, AlertTriangle, Upload, Video } from 'lucide-react';
+import { Play, Radio, Activity, Waves, AlertCircle, AlertTriangle, Upload, Video, Gauge } from 'lucide-react';
+
+const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1] as const;
+type SpeedOption = typeof SPEED_OPTIONS[number];
 import { motion, AnimatePresence } from 'motion/react';
 import AnalysisSettings from './AnalysisSettings';
 import { useGaitAnalyzer } from '../hooks/useGaitAnalyzer';
@@ -10,13 +13,15 @@ interface DashboardProps {
   videoSrc?: string | null;
   onRecord?: () => void;
   onUpload?: (file: File) => void;
+  onOpenGlossary?: () => void;
 }
 
-export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardProps) {
+export default function Dashboard({ videoSrc, onRecord, onUpload, onOpenGlossary }: DashboardProps) {
   const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, medialCollapse, startAnalysis, getSessionData, visibilityWarning, applyConfig, resetConfig } = useGaitAnalyzer();
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [playbackRate, setPlaybackRate] = useState<SpeedOption>(1);
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) { onUpload?.(file); e.target.value = ''; }
@@ -100,6 +105,15 @@ export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardPro
 
     return () => resizeObserver.disconnect();
   }, [videoRef, canvasRef]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.playbackRate = playbackRate;
+    const sync = () => { v.playbackRate = playbackRate; };
+    v.addEventListener('canplay', sync);
+    return () => v.removeEventListener('canplay', sync);
+  }, [playbackRate, videoSrc, videoRef]);
 
   if (isLoading) {
     return (
@@ -264,9 +278,30 @@ export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardPro
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2 font-mono text-[10px] text-on-surface-variant bg-surface-container-high px-4 py-2 rounded-xl border border-outline-variant shadow-sm uppercase font-bold">
-                  <Radio className={cn("w-3 h-3 transition-colors", isProcessing ? "text-primary" : "text-outline")} />
-                  Mediapipe_v3.0
+                <div className="flex items-center gap-3">
+                  {videoSrc && (
+                    <div className="flex items-center gap-1.5">
+                      <Gauge className="w-3 h-3 text-on-surface-variant/50" />
+                      {SPEED_OPTIONS.map(s => (
+                        <button
+                          key={s}
+                          onClick={() => setPlaybackRate(s)}
+                          className={cn(
+                            'px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold transition-all',
+                            playbackRate === s
+                              ? 'bg-primary/15 border border-primary/40 text-primary'
+                              : 'bg-surface-container-high border border-outline-variant text-on-surface-variant hover:border-primary/30 hover:text-primary'
+                          )}
+                        >
+                          {s}×
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 font-mono text-[10px] text-on-surface-variant bg-surface-container-high px-4 py-2 rounded-xl border border-outline-variant shadow-sm uppercase font-bold">
+                    <Radio className={cn("w-3 h-3 transition-colors", isProcessing ? "text-primary" : "text-outline")} />
+                    Mediapipe_v3.0
+                  </div>
                 </div>
               </div>
             </div>
@@ -505,7 +540,7 @@ export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardPro
 
         {/* Configuration Hardware Section */}
         <div className="lg:col-span-12">
-          <AnalysisSettings onApply={applyConfig} onReset={resetConfig} />
+          <AnalysisSettings onApply={applyConfig} onReset={resetConfig} onOpenGlossary={onOpenGlossary} />
         </div>
       </div>
     </div>

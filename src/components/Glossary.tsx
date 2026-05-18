@@ -454,6 +454,40 @@ const TERMS: Term[] = [
     why: "A single headline number makes session quality immediately communicable — useful for quick progress tracking and for sharing results with non-technical stakeholders.",
     related: ["Symmetry Index", "Cadence", "Engine Confidence"],
   },
+
+  // ── ENGINE CONFIGURATION ──────────────────────────────────────────────────
+  {
+    term: "Stride Sensitivity",
+    category: "Engine Configuration",
+    definition:
+      "A slider (0–100%) that controls the EMA alpha (α) applied to raw landmark positions before angle computation. At 0% (Coarse) α = 0.05 — heavy smoothing removes jitter but may blur fast events. At 100% (Ultra-Fine) α = 0.45 — minimal smoothing follows the signal closely but lets noise through.",
+    why: "Camera quality, recording distance, and subject clothing all affect how noisy the pose signal is. Stride Sensitivity lets you trade off noise suppression against detection speed: lower values for distant or shaky cameras, higher values for close, stable setups.",
+    related: ["EMA (Exponential Moving Average)", "Alpha (α)", "Sensitivity"],
+  },
+  {
+    term: "Ankle Trigger",
+    category: "Engine Configuration",
+    definition:
+      "A threshold angle (5°–45°, default 25°) for ankle-related biomechanical events. When the computed ankle angle deviates from neutral by more than this value, an ankle event is flagged. A lower value makes the system more sensitive to small ankle deviations; a higher value only fires on pronounced plantarflexion or dorsiflexion.",
+    why: "Subjects with limited ankle mobility (post-surgery, orthotics, older adults) rarely reach the default threshold. Lowering Ankle Trigger to 10–15° allows the engine to still capture these events. Conversely, raising it suppresses false positives in subjects with naturally high ankle excursion.",
+    related: ["Ankle Angle", "Threshold", "Toe-Off"],
+  },
+  {
+    term: "Knee Lockout",
+    category: "Engine Configuration",
+    definition:
+      "A threshold angle (0°–180°, default 155°) that defines the 'extended' position of the knee used to detect heel strikes. When the knee angle rises above this value it is treated as the beginning of the stance phase. Lower values fire earlier (less extension required); higher values require a more fully extended knee.",
+    why: "Some populations — amputees, individuals with knee contracture, or children — never achieve full knee extension during stance. Reducing Knee Lockout to 130–140° allows stride detection to work for these subjects. Increasing it toward 170° makes heel-strike detection stricter, reducing false positives in highly dynamic movements.",
+    related: ["Knee Flexion", "Heel Strike", "Threshold", "Stride Sensitivity"],
+  },
+  {
+    term: "Auto-Scale Skeleton",
+    category: "Engine Configuration",
+    definition:
+      "A toggle that enables dynamic, per-frame normalization of the skeleton overlay. When ON, the engine rescales the detected pose to fill the canvas based on the bounding box of the visible landmarks each frame. When OFF, the skeleton is drawn at the raw normalized coordinates returned by MediaPipe.",
+    why: "Auto-scaling is useful when the subject moves closer or further from the camera across the clip, keeping the skeleton visible. It should be turned OFF for accurate metric comparisons across sessions or when the subject's distance from the camera must remain constant (e.g., clinical setups with fixed camera placement), as scaling changes the apparent joint positions.",
+    related: ["Normalized Landmarks", "Skeletal Overlay", "Landmarks"],
+  },
 ];
 
 const CATEGORIES = [
@@ -465,6 +499,7 @@ const CATEGORIES = [
   "3D Visualization",
   "Recording & Media",
   "Data & Sessions",
+  "Engine Configuration",
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -475,6 +510,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "3D Visualization": "text-pink-400 border-pink-400/40 bg-pink-400/10",
   "Recording & Media": "text-green-400 border-green-400/40 bg-green-400/10",
   "Data & Sessions": "text-orange-400 border-orange-400/40 bg-orange-400/10",
+  "Engine Configuration": "text-teal-400 border-teal-400/40 bg-teal-400/10",
 };
 
 function TermCard({ term }: { term: Term }) {

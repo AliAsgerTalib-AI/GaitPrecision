@@ -1,4 +1,4 @@
-import { Settings2, Sliders, Target, ShieldCheck, Info } from 'lucide-react';
+import { Settings2, Sliders, Target, ShieldCheck, Info, BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -8,9 +8,10 @@ import { DEFAULT_CONFIG } from '@/src/hooks/useGaitAnalyzer';
 interface AnalysisSettingsProps {
   onApply: (config: GaitConfig) => void;
   onReset: () => void;
+  onOpenGlossary?: () => void;
 }
 
-export default function AnalysisSettings({ onApply, onReset }: AnalysisSettingsProps) {
+export default function AnalysisSettings({ onApply, onReset, onOpenGlossary }: AnalysisSettingsProps) {
   const [sensitivity, setSensitivity] = useState(DEFAULT_CONFIG.sensitivity);
   const [ankleThreshold, setAnkleThreshold] = useState(DEFAULT_CONFIG.ankleThreshold);
   const [kneeThreshold, setKneeThreshold] = useState(DEFAULT_CONFIG.kneeThreshold);
@@ -26,9 +27,20 @@ export default function AnalysisSettings({ onApply, onReset }: AnalysisSettingsP
           </h2>
           <p className="text-on-surface-variant text-sm mt-1 font-sans">Tune biomechanical processing parameters for specific subjects.</p>
         </div>
-        <div className="bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg flex items-center gap-2">
-          <ShieldCheck className="w-3 h-3 text-primary" />
-          <span className="font-mono text-[9px] text-primary uppercase tracking-widest font-bold">Local Config Only</span>
+        <div className="flex items-center gap-3">
+          {onOpenGlossary && (
+            <button
+              onClick={onOpenGlossary}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-high text-on-surface-variant hover:border-primary/40 hover:text-primary transition-all"
+            >
+              <BookOpen className="w-3 h-3" />
+              <span className="font-mono text-[9px] uppercase tracking-widest font-bold">Explain Parameters</span>
+            </button>
+          )}
+          <div className="bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg flex items-center gap-2">
+            <ShieldCheck className="w-3 h-3 text-primary" />
+            <span className="font-mono text-[9px] text-primary uppercase tracking-widest font-bold">Local Config Only</span>
+          </div>
         </div>
       </div>
 
