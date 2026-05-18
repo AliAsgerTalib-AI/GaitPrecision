@@ -27,6 +27,13 @@ export const DEFAULT_CONFIG: GaitConfig = {
   autoScale: true,
 };
 
+export interface MedialCollapseStatus {
+  left: boolean;
+  right: boolean;
+  leftMessage: string;
+  rightMessage: string;
+}
+
 interface JointAngles {
   left: number[];
   right: number[];
@@ -101,6 +108,40 @@ function freshGaitState(): { left: LegGaitState; right: LegGaitState } {
   return { left: leg(), right: leg() };
 }
 
+function detectMedialCollapse(lm: NormalizedLandmark[], side: 'left' | 'right'): { collapsed: boolean; message: string } {
+  const knee  = side === 'left' ? lm[25] : lm[26];
+  const ankle = side === 'left' ? lm[27] : lm[28];
+  if (!knee || !ankle) return { collapsed: false, message: '' };
+  if (Math.abs(knee.x - ankle.x) > 0.05) {
+    return { collapsed: true, message: 'Knee Tracking Inside Ankle Detected: Dynamic Valgus Risk.' };
+  }
+  return { collapsed: false, message: '' };
+}
+
+function drawCollapseSegment(ctx: CanvasRenderingContext2D, lm: NormalizedLandmark[], kneeIdx: number, ankleIdx: number) {
+  const knee  = lm[kneeIdx];
+  const ankle = lm[ankleIdx];
+  if (!knee || !ankle) return;
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  ctx.save();
+  ctx.strokeStyle = '#FF3366';
+  ctx.lineWidth = 3;
+  ctx.shadowColor = '#FF3366';
+  ctx.shadowBlur = 14;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(knee.x * w, knee.y * h);
+  ctx.lineTo(ankle.x * w, ankle.y * h);
+  ctx.stroke();
+  ctx.fillStyle = '#FF3366';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.arc(knee.x * w, knee.y * h, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 export function useGaitAnalyzer() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -115,6 +156,8 @@ export function useGaitAnalyzer() {
     left:  { stancePercent: 0, swingPercent: 0, strideTime: 0 },
     right: { stancePercent: 0, swingPercent: 0, strideTime: 0 },
   });
+  const [medialCollapse, setMedialCollapse] = useState<MedialCollapseStatus>({ left: false, right: false, leftMessage: '', rightMessage: '' });
+  const medialCollapseRef = useRef<MedialCollapseStatus>({ left: false, right: false, leftMessage: '', rightMessage: '' });
 
   // Live-configurable parameters — written by applyConfig, read inside the rAF loop.
   const emaAlphaRef        = useRef(EMA_ALPHA);
@@ -319,6 +362,18 @@ export function useGaitAnalyzer() {
             if (Math.abs(emaAnkleRightRef.current - 90) >= ankleGate) ankleFullRef.current.right.push(emaAnkleRightRef.current);
           }
 
+          // ── Medial collapse detection ─────────────────────────────────────
+          const leftCollapse  = detectMedialCollapse(lm, 'left');
+          const rightCollapse = detectMedialCollapse(lm, 'right');
+          medialCollapseRef.current = {
+            left:         leftCollapse.collapsed,
+            right:        rightCollapse.collapsed,
+            leftMessage:  leftCollapse.message,
+            rightMessage: rightCollapse.message,
+          };
+          if (leftCollapse.collapsed)  drawCollapseSegment(ctx, drawLm, 25, 27);
+          if (rightCollapse.collapsed) drawCollapseSegment(ctx, drawLm, 26, 28);
+
           // ── Stride event detection from knee threshold crossings ──────────
           const t = video.currentTime;
           detectStrideEvent(gaitStateRef.current.left,  emaLeftRef.current,  t, heelStrikeRef.current, toeOffRef.current);
@@ -342,12 +397,17 @@ export function useGaitAnalyzer() {
               left: leftLeg,
               right: rightLeg,
             });
+            setMedialCollapse({ ...medialCollapseRef.current });
           }
         } else {
           consecutiveDropRef.current++;
           if (consecutiveDropRef.current >= VISIBILITY_WARN_FRAMES && !visibilityWarnRef.current) {
             visibilityWarnRef.current = true;
             setVisibilityWarning(true);
+          }
+          if (medialCollapseRef.current.left || medialCollapseRef.current.right) {
+            medialCollapseRef.current = { left: false, right: false, leftMessage: '', rightMessage: '' };
+            setMedialCollapse({ left: false, right: false, leftMessage: '', rightMessage: '' });
           }
         }
       } else {
@@ -356,6 +416,10 @@ export function useGaitAnalyzer() {
         if (consecutiveDropRef.current >= VISIBILITY_WARN_FRAMES && !visibilityWarnRef.current) {
           visibilityWarnRef.current = true;
           setVisibilityWarning(true);
+        }
+        if (medialCollapseRef.current.left || medialCollapseRef.current.right) {
+          medialCollapseRef.current = { left: false, right: false, leftMessage: '', rightMessage: '' };
+          setMedialCollapse({ left: false, right: false, leftMessage: '', rightMessage: '' });
         }
       }
     }
@@ -415,6 +479,8 @@ export function useGaitAnalyzer() {
     consecutiveDropRef.current = 0;
     visibilityWarnRef.current  = false;
     setVisibilityWarning(false);
+    medialCollapseRef.current = { left: false, right: false, leftMessage: '', rightMessage: '' };
+    setMedialCollapse({ left: false, right: false, leftMessage: '', rightMessage: '' });
     // Stop processing cleanly when the clip finishes.
     video.addEventListener('ended', () => setIsProcessing(false), { once: true });
     video.play().catch(console.error);
@@ -430,6 +496,7 @@ export function useGaitAnalyzer() {
     hipAngles,
     ankleAngles,
     strideMetrics,
+    medialCollapse,
     getSessionData,
     visibilityWarning,
     startAnalysis,

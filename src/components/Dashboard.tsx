@@ -13,7 +13,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardProps) {
-  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis, getSessionData, visibilityWarning, applyConfig, resetConfig } = useGaitAnalyzer();
+  const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, medialCollapse, startAnalysis, getSessionData, visibilityWarning, applyConfig, resetConfig } = useGaitAnalyzer();
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -388,6 +388,30 @@ export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardPro
                       <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em]">Asymmetry Violation</p>
                       <p className="text-sm font-sans font-medium mt-2 leading-relaxed">
                         Knee flexion deviation exceeds the safe biological baseline of 15.0°.
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* MEDIAL COLLAPSE ALERT */}
+              <AnimatePresence>
+                {(medialCollapse.left || medialCollapse.right) && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -16, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -16, scale: 0.95 }}
+                    className="p-5 bg-[#FF3366]/10 border border-[#FF3366]/30 rounded-2xl flex gap-4 shadow-lg shadow-[#FF3366]/5 relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#FF3366]/5 rounded-full -translate-y-12 translate-x-12" />
+                    <AlertCircle className="w-6 h-6 shrink-0 mt-1 text-[#FF3366]" />
+                    <div className="relative z-10">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#FF3366]">
+                        Dynamic Valgus Risk —{' '}
+                        {medialCollapse.left && medialCollapse.right ? 'Both Legs' : medialCollapse.left ? 'Left Leg' : 'Right Leg'}
+                      </p>
+                      <p className="text-sm font-sans font-medium mt-2 leading-relaxed text-[#FF3366]/80">
+                        Knee tracking inside ankle baseline. Check gluteus medius engagement, hip stability, and foot pronation tolerances.
                       </p>
                     </div>
                   </motion.div>

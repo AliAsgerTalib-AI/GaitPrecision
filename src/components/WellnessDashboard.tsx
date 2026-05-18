@@ -13,6 +13,73 @@ interface WellnessDashboardProps {
   onUpload?: (file: File) => void;
 }
 
+const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1] as const;
+type SpeedOption = typeof SPEED_OPTIONS[number];
+
+function generateDiagnosis(score: number, asymmetry: number, cadence: number, riskLevel: 'Low' | 'Moderate' | 'Elevated') {
+  let headline: string;
+  let summary: string;
+  let color: string;
+  const findings: string[] = [];
+
+  if (score >= 85) {
+    headline = 'Excellent Walking Pattern';
+    summary = 'Your gait analysis shows excellent biomechanical quality across all measured parameters. Your movement patterns are well within healthy norms.';
+    color = 'text-primary';
+  } else if (score >= 70) {
+    headline = 'Good Walking Pattern';
+    summary = 'Your gait shows a good foundation with minor areas that could benefit from targeted attention.';
+    color = 'text-primary';
+  } else if (score >= 50) {
+    headline = 'Fair Walking Pattern — Some Areas to Watch';
+    summary = 'Your walking pattern shows functional movement with some compensatory mechanics that may benefit from professional guidance.';
+    color = 'text-[#f59e0b]';
+  } else {
+    headline = 'Walking Pattern Needs Professional Attention';
+    summary = 'Your gait analysis has identified several biomechanical concerns. A physiotherapist evaluation is recommended.';
+    color = 'text-error';
+  }
+
+  if (asymmetry <= 10) {
+    findings.push('Symmetrical loading — left and right legs are sharing the work evenly, indicating good neuromuscular control.');
+  } else if (asymmetry <= 20) {
+    findings.push(`Mild asymmetry of ${asymmetry.toFixed(0)}° detected. One leg is doing slightly more work — common in most adults but worth monitoring.`);
+  } else {
+    findings.push(`Significant asymmetry of ${asymmetry.toFixed(0)}° detected. One side is carrying considerably more load, increasing long-term joint stress.`);
+  }
+
+  if (cadence > 0) {
+    if (cadence < 80) {
+      findings.push(`Cadence of ${cadence} spm is below recommended levels. A slower cadence increases ground-reaction forces and fall risk.`);
+    } else if (cadence < 100) {
+      findings.push(`Cadence of ${cadence} spm is moderate. Aim for 100–120 spm for optimal cardiovascular and joint benefit.`);
+    } else if (cadence <= 120) {
+      findings.push(`Cadence of ${cadence} spm falls within the ideal healthy range (100–120 spm) — excellent walking rhythm.`);
+    } else {
+      findings.push(`Brisk cadence of ${cadence} spm — great for cardiovascular health and metabolic efficiency.`);
+    }
+  }
+
+  if (riskLevel === 'Elevated') {
+    findings.push('Multiple gait indicators converge on elevated fall risk. Immediate assessment by a healthcare professional is advised.');
+  } else if (riskLevel === 'Moderate') {
+    findings.push('Moderate fall risk indicators present. Balance training and targeted hip strengthening are recommended.');
+  } else {
+    findings.push('Overall fall risk is low — gait stability indicators are within safe limits.');
+  }
+
+  let recommendation: string;
+  if (riskLevel === 'Elevated' || score < 50) {
+    recommendation = 'Schedule an appointment with a physiotherapist or sports medicine physician. A detailed functional movement assessment can identify the root causes and guide an appropriate rehabilitation programme.';
+  } else if (riskLevel === 'Moderate' || score < 70) {
+    recommendation = 'Consider adding balance and coordination exercises to your weekly routine — single-leg stance, heel-toe walking, and hip strengthening are excellent starting points. Reassess in 4–6 weeks to track improvement.';
+  } else {
+    recommendation = 'Maintain your current activity level. Complement your healthy walking mechanics with resistance training and flexibility work for long-term mobility and joint health.';
+  }
+
+  return { headline, summary, findings, recommendation, color };
+}
+
 function wellnessLabel(score: number): { label: string; color: string; bg: string } {
   if (score >= 85) return { label: 'Excellent', color: 'text-primary', bg: 'bg-primary/10 border-primary/20' };
   if (score >= 70) return { label: 'Good', color: 'text-primary', bg: 'bg-primary/10 border-primary/20' };
@@ -47,6 +114,8 @@ function fallRisk(asymmetry: number, cadence: number, score: number): { level: '
 export default function WellnessDashboard({ videoSrc, onRecord, onUpload }: WellnessDashboardProps) {
   const { videoRef, canvasRef, isReady, isProcessing, kneeAngles, hipAngles, ankleAngles, strideMetrics, startAnalysis, getSessionData } = useGaitAnalyzer();
   const [isLoading, setIsLoading] = useState(true);
+  const [playbackRate, setPlaybackRate] = useState<SpeedOption>(1);
+  const [analysisComplete, setAnalysisComplete] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -58,6 +127,19 @@ export default function WellnessDashboard({ videoSrc, onRecord, onUpload }: Well
     const timer = setTimeout(() => setIsLoading(false), 2000);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.playbackRate = playbackRate;
+    const sync = () => { v.playbackRate = playbackRate; };
+    v.addEventListener('canplay', sync);
+    return () => v.removeEventListener('canplay', sync);
+  }, [playbackRate, videoSrc, videoRef]);
+
+  useEffect(() => {
+    if (isProcessing) setAnalysisComplete(false);
+  }, [isProcessing]);
 
   const currentLeftAngle = kneeAngles.left[kneeAngles.left.length - 1] || 0;
   const currentRightAngle = kneeAngles.right[kneeAngles.right.length - 1] || 0;
@@ -104,6 +186,7 @@ export default function WellnessDashboard({ videoSrc, onRecord, onUpload }: Well
       stride: strideRef.current,
     };
     saveSession(session).catch(console.error);
+    setAnalysisComplete(true);
   }, [isProcessing, getSessionData]);
 
   useEffect(() => {
@@ -216,41 +299,30 @@ export default function WellnessDashboard({ videoSrc, onRecord, onUpload }: Well
                 <p className="text-sm font-medium text-on-surface">{isProcessing ? 'Analysing your walk…' : videoSrc ? 'Press play to analyse' : 'Upload or record a video'}</p>
                 <p className="text-xs text-on-surface-variant mt-0.5">Your skeleton will appear as the video plays</p>
               </div>
-            </div>
-          </div>
-
-          {/* Step balance bar */}
-          <div className="bg-surface-container p-6 rounded-2xl border border-outline-variant">
-            <h3 className="text-base font-semibold text-on-surface mb-1">How You're Stepping</h3>
-            <p className="text-sm text-on-surface-variant mb-5">The bar below shows how much time each leg spends on the ground.</p>
-
-            <div className="h-14 w-full flex rounded-xl overflow-hidden border border-outline-variant bg-surface-container-low">
-              {strideMetrics.left.strideTime > 0 ? (
-                <>
-                  <div className="h-full bg-primary/40 flex items-center justify-center text-xs font-medium text-primary px-2 shrink-0" style={{ width: `${strideMetrics.left.stancePercent / 2}%` }}>
-                    Left {strideMetrics.left.stancePercent}%
-                  </div>
-                  <div className="h-full bg-primary/10 flex items-center justify-center text-xs text-primary/60 px-2 shrink-0" style={{ width: `${strideMetrics.left.swingPercent / 2}%` }}>
-                    swing
-                  </div>
-                  <div className="h-full bg-secondary/30 flex items-center justify-center text-xs font-medium text-secondary px-2 shrink-0" style={{ width: `${strideMetrics.right.stancePercent / 2}%` }}>
-                    Right {strideMetrics.right.stancePercent}%
-                  </div>
-                  <div className="h-full bg-secondary/10 grow flex items-center justify-center text-xs text-secondary/60">swing</div>
-                </>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-sm text-on-surface-variant">
-                  {isProcessing ? 'Detecting steps…' : 'Start analysis to see your step pattern'}
+              {videoSrc && (
+                <div className="ml-auto flex items-center gap-0.5">
+                  {SPEED_OPTIONS.map(rate => (
+                    <button
+                      key={rate}
+                      onClick={() => {
+                        setPlaybackRate(rate);
+                        if (videoRef.current) videoRef.current.playbackRate = rate;
+                      }}
+                      className={cn(
+                        'px-2 py-1 rounded-lg font-mono text-[10px] font-bold uppercase tracking-wide transition-all',
+                        playbackRate === rate
+                          ? 'bg-primary text-on-primary shadow-sm'
+                          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high'
+                      )}
+                    >
+                      {rate}×
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
-
-            {strideMetrics.cadence > 0 && (
-              <p className="text-sm text-on-surface-variant mt-3 text-center">
-                You're taking <strong className="text-on-surface">{strideMetrics.cadence} steps per minute</strong> — {cadence.label.toLowerCase()}
-              </p>
-            )}
           </div>
+
         </section>
 
         {/* Wellness Metrics */}
@@ -396,6 +468,57 @@ export default function WellnessDashboard({ videoSrc, onRecord, onUpload }: Well
           </motion.div>
         </aside>
       </div>
+
+      {/* Diagnosis panel */}
+      <AnimatePresence>
+        {analysisComplete && hasData && (() => {
+          const dx = generateDiagnosis(score, asymmetry, strideMetrics.cadence, risk.level);
+          return (
+            <motion.div
+              key="diagnosis"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="mt-6 bg-surface-container rounded-2xl border border-outline-variant overflow-hidden"
+            >
+              {/* Header */}
+              <div className="px-6 pt-6 pb-4 border-b border-outline-variant/50 flex items-start gap-4">
+                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', risk.level === 'Elevated' ? 'bg-error/10' : risk.level === 'Moderate' ? 'bg-[#f59e0b]/10' : 'bg-primary/10')}>
+                  {risk.level === 'Low' ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <AlertTriangle className={cn('w-5 h-5', risk.level === 'Elevated' ? 'text-error' : 'text-[#f59e0b]')} />}
+                </div>
+                <div>
+                  <p className="text-xs font-mono font-bold uppercase tracking-widest text-on-surface-variant/60 mb-1">Analysis Complete — Diagnosis</p>
+                  <h2 className={cn('text-xl font-display font-bold', dx.color)}>{dx.headline}</h2>
+                  <p className="text-sm text-on-surface-variant mt-1 leading-relaxed max-w-2xl">{dx.summary}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-outline-variant/50">
+                {/* Findings */}
+                <div className="px-6 py-5">
+                  <p className="text-xs font-mono font-bold uppercase tracking-widest text-on-surface-variant/60 mb-3">Key Findings</p>
+                  <ul className="space-y-3">
+                    {dx.findings.map((f, i) => (
+                      <li key={i} className="flex items-start gap-3 text-sm text-on-surface-variant leading-relaxed">
+                        <span className="mt-1 w-1.5 h-1.5 rounded-full bg-primary/60 flex-shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Recommendation */}
+                <div className="px-6 py-5">
+                  <p className="text-xs font-mono font-bold uppercase tracking-widest text-on-surface-variant/60 mb-3">Recommendation</p>
+                  <p className="text-sm text-on-surface leading-relaxed">{dx.recommendation}</p>
+                  <p className="text-xs text-on-surface-variant/40 mt-4 italic">This analysis is for informational purposes only and does not constitute medical advice.</p>
+                </div>
+              </div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
     </div>
   );
 }
