@@ -17,7 +17,7 @@ import type { ActivityType } from "./Recorder";
 
 interface HeroProps {
   onStartAnalysis: (type: ActivityType) => void;
-  onUploadComplete: (file: File) => void;
+  onUploadComplete: (file: File, type: ActivityType) => void;
   onHome: () => void;
 }
 
@@ -71,6 +71,7 @@ export default function Hero({
   onHome,
 }: HeroProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -84,12 +85,16 @@ export default function Hero({
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith("video/")) onUploadComplete(file);
+    if (file && file.type.startsWith("video/")) setPendingFile(file);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) onUploadComplete(file);
+    if (file) { setPendingFile(file); e.target.value = ''; }
+  };
+
+  const handleModeSelect = (type: ActivityType) => {
+    if (pendingFile) { onUploadComplete(pendingFile, type); setPendingFile(null); }
   };
 
   return (
@@ -208,6 +213,47 @@ export default function Hero({
           </div>
         </motion.div>
       </section>
+
+      {/* Analysis mode picker modal — shown after a video is selected for upload */}
+      {pendingFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface/80 backdrop-blur-sm px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-2xl bg-surface-container border border-outline-variant rounded-2xl p-8 shadow-2xl"
+          >
+            <div className="mb-6">
+              <h2 className="text-xl font-display font-bold text-on-surface mb-1">Choose Analysis Mode</h2>
+              <p className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest opacity-60">
+                Select the type of analysis to run on <span className="text-primary">{pendingFile.name}</span>
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+              {MODES.map(({ type, icon: Icon, label, desc }) => (
+                <button
+                  key={type}
+                  onClick={() => handleModeSelect(type)}
+                  className="group flex flex-col items-center gap-3 p-4 bg-surface-container-low border border-outline-variant rounded-2xl hover:border-primary/50 hover:bg-surface-container-high transition-all text-left"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:scale-110 group-hover:bg-primary/15 transition-all">
+                    <Icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="w-full">
+                    <p className="font-mono text-[10px] font-bold text-on-surface uppercase tracking-wider leading-none mb-1">{label}</p>
+                    <p className="font-mono text-[8px] text-on-surface-variant opacity-60 leading-snug">{desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPendingFile(null)}
+              className="w-full py-2.5 border border-outline-variant rounded-xl font-mono text-xs text-on-surface-variant hover:border-primary/50 hover:text-primary transition-all"
+            >
+              Cancel
+            </button>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

@@ -287,10 +287,6 @@ export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardPro
                     <p className="font-mono text-xl font-bold text-primary tabular-nums">{strideMetrics.cadence}<span className="text-[10px] text-on-surface-variant ml-1">spm</span></p>
                   </div>
                 )}
-                <div className="font-mono text-[10px] flex gap-6 font-bold tracking-widest">
-                  <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_#57f1db]"></span> STANCE</span>
-                  <span className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-primary/20"></span> SWING</span>
-                </div>
               </div>
             </div>
 
@@ -321,7 +317,7 @@ export default function Dashboard({ videoSrc, onRecord, onUpload }: DashboardPro
             ) : (
               <div className="h-20 w-full flex items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-low shadow-inner">
                 <span className="font-mono text-[10px] font-bold italic opacity-40 uppercase tracking-widest">
-                  {isProcessing ? 'DETECTING...' : 'AWAITING DATA'}
+                  {isProcessing ? 'DETECTING...' : videoSrc ? 'NO STRIDE DATA DETECTED' : 'AWAITING DATA'}
                 </span>
               </div>
             )}

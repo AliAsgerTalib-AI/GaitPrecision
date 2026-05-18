@@ -3,7 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Share2, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, fmtDate, fmtDuration } from '@/src/lib/utils';
-import { loadSessions, deleteSession, type GaitSession } from '@/src/lib/sessionDb';
+import { loadSessions, deleteSession, clearAllSessions, type GaitSession } from '@/src/lib/sessionDb';
 
 const Gait3D = lazy(() => import('./Gait3D'));
 
@@ -24,6 +24,7 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
   const [compareA, setCompareA] = useState<GaitSession | null>(null);
   const [compareB, setCompareB] = useState<GaitSession | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   useEffect(() => {
     loadSessions().then(setSessions).catch(console.error);
@@ -35,6 +36,14 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
     if (compareA?.id === id) setCompareA(null);
     if (compareB?.id === id) setCompareB(null);
     setSessions(prev => prev.filter(s => s.id !== id));
+  }
+
+  async function handleDeleteAll() {
+    await clearAllSessions();
+    setConfirmDeleteAll(false);
+    setCompareA(null);
+    setCompareB(null);
+    setSessions([]);
   }
 
   function toggleCompare() {
@@ -388,6 +397,32 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
             <TrendingUp className="w-4 h-4" />
             {compareMode ? 'EXIT_COMPARE' : 'COMPARE_SESSIONS'}
           </button>
+          {sessions.length > 0 && (
+            confirmDeleteAll ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDeleteAll}
+                  className="flex items-center gap-2 px-6 py-3 bg-error/10 border border-error/40 text-error rounded-xl font-mono text-xs font-bold uppercase tracking-widest hover:bg-error/20 transition-all active:scale-95"
+                >
+                  <Trash2 className="w-4 h-4" /> Confirm Delete All
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteAll(false)}
+                  className="px-4 py-3 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-xs font-bold text-on-surface-variant hover:border-primary/50 transition-all active:scale-95"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteAll(true)}
+                className="flex items-center gap-3 px-6 py-3 bg-surface-container-high border border-outline-variant text-on-surface-variant hover:border-error/50 hover:text-error font-mono text-xs font-bold rounded-xl transition-all active:scale-95"
+              >
+                <Trash2 className="w-4 h-4" />
+                DELETE_ALL
+              </button>
+            )
+          )}
         </div>
       </section>
 

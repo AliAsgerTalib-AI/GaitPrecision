@@ -51,7 +51,7 @@ function AppInner() {
         ) : (
           <Hero
             onStartAnalysis={(type) => { setActivityType(type); setCurrentView('recording'); }}
-            onUploadComplete={(file) => { setVideo(file); setCurrentView('dashboard'); }}
+            onUploadComplete={(file, type) => { setActivityType(type); setVideo(file); setCurrentView('dashboard'); }}
             onHome={() => setCurrentView('home')}
           />
         );
