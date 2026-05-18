@@ -1,9 +1,11 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Share2, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio, Trash2 } from 'lucide-react';
+import { Share2, Calendar, Timer, Activity, ClipboardList, TrendingUp, Radio, Trash2, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, fmtDate, fmtDuration } from '@/src/lib/utils';
 import { loadSessions, deleteSession, clearAllSessions, type GaitSession } from '@/src/lib/sessionDb';
+import { getProfile, getAgeGroup } from '@/src/lib/userProfile';
+import { generateSessionPDF } from '@/src/lib/pdfReport';
 
 const Gait3D = lazy(() => import('./Gait3D'));
 
@@ -279,12 +281,21 @@ export default function Report({ onViewProfile }: { onViewProfile: () => void })
               <p className="text-on-surface-variant font-mono text-[10px] uppercase tracking-widest">{selectedSession.label} // {fmtDate(selectedSession.date)}</p>
             </div>
           </div>
-          <button
-            onClick={() => setSelectedSession(null)}
-            className="px-6 py-3 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-xs font-bold uppercase tracking-widest hover:border-primary/50 transition-all text-primary"
-          >
-            Close_Detail_View
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => generateSessionPDF(selectedSession, getProfile(), getAgeGroup())}
+              className="flex items-center gap-2 px-5 py-3 bg-primary/10 border border-primary/30 rounded-xl font-mono text-xs font-bold uppercase tracking-widest hover:bg-primary/20 transition-all text-primary"
+            >
+              <Download className="w-4 h-4" />
+              Download_PDF
+            </button>
+            <button
+              onClick={() => setSelectedSession(null)}
+              className="px-6 py-3 bg-surface-container-high border border-outline-variant rounded-xl font-mono text-xs font-bold uppercase tracking-widest hover:border-primary/50 transition-all text-primary"
+            >
+              Close_Detail_View
+            </button>
+          </div>
         </motion.div>
 
         <div className="grid grid-cols-12 gap-8">

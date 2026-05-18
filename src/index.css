@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -54,6 +54,7 @@
   --animate-scan: scan 4s linear infinite;
   --animate-dash: dash 3s ease-in-out infinite alternate;
   --animate-shimmer: shimmer 2s linear infinite;
+  --animate-glow-pulse: glow-pulse 2.4s ease-in-out infinite;
 
   @keyframes scan {
     0% { top: 0; }
@@ -64,6 +65,10 @@
   }
   @keyframes shimmer {
     100% { transform: translateX(100%); }
+  }
+  @keyframes glow-pulse {
+    0%, 100% { filter: drop-shadow(0 0 6px rgba(87,241,219,0.4)); }
+    50%       { filter: drop-shadow(0 0 20px rgba(87,241,219,0.9)); }
   }
 }
 

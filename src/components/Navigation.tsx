@@ -68,10 +68,15 @@ export default function Navigation({
           <div className="flex items-center gap-8">
             <button
               onClick={() => onNavigate("home")}
-              className="flex items-center gap-2 focus:outline-none"
+              className="flex items-center gap-1 focus:outline-none group"
               aria-label="Go to home"
             >
-              <img src="/logo.png" alt="Symphery" className="h-9 w-auto" />
+              <span className="font-display text-2xl font-bold tracking-tight text-primary animate-[glow-pulse_2.4s_ease-in-out_infinite]">
+                Gait
+              </span>
+              <span className="font-display text-lg font-thin tracking-tight text-on-surface">
+                Precision
+              </span>
             </button>
             <nav className="hidden md:flex gap-6 items-center">
               {navItems.map((item) => (
