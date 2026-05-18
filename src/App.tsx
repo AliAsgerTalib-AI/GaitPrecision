@@ -17,7 +17,9 @@ import WellnessHome from './components/WellnessHome';
 import WellnessDashboard from './components/WellnessDashboard';
 import WellnessReport from './components/WellnessReport';
 import { ModeProvider, useMode } from './lib/modeContext';
+import { AccessibilityProvider } from './contexts/AccessibilityContext';
 import { motion, AnimatePresence } from 'motion/react';
+import OnboardingModal from './components/OnboardingModal';
 
 type View = 'home' | 'dashboard' | 'report' | 'recording' | 'profile' | 'help' | 'glossary';
 
@@ -147,9 +149,12 @@ function AppInner() {
 
 export default function App() {
   return (
-    <ModeProvider>
-      <AppInner />
-    </ModeProvider>
+    <AccessibilityProvider>
+      <ModeProvider>
+        <AppInner />
+        <OnboardingModal />
+      </ModeProvider>
+    </AccessibilityProvider>
   );
 }
 

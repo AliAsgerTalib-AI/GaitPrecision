@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Video, Square, RefreshCcw, CheckCircle2, ShieldCheck, Cpu, AlertCircle, Circle, PersonStanding, Dumbbell, Weight, Zap } from 'lucide-react';
+import { Video, Square, RefreshCcw, CheckCircle2, ShieldCheck, Cpu, AlertCircle, Circle, PersonStanding, Dumbbell, Weight, Zap, Info, Camera, Move, Timer, ChevronDown } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useCameraSetup, type SetupChecks } from '@/src/hooks/useCameraSetup';
 
@@ -25,6 +25,7 @@ export default function Recorder({ initialType = 'gait', onComplete, onCancel }:
   const [error, setError] = useState<{ title: string; message: string; type: 'permission' | 'device' | 'hardware' | 'unknown' } | null>(null);
   const [duration, setDuration] = useState(0);
   const timerRef = useRef<number | null>(null);
+  const [showTips, setShowTips] = useState(false);
 
   // Camera setup validation only runs for gait/stair modes (side-on view). Balance uses a frontal view.
   const { isReady: setupReady, checks, allPassed } = useCameraSetup(videoRef, !!stream && !setupDone && activityType !== 'balance' && activityType !== 'exercise');
@@ -340,6 +341,59 @@ export default function Recorder({ initialType = 'gait', onComplete, onCancel }:
               exit={{ opacity: 0, y: 10 }}
               className="py-5 space-y-4"
             >
+              {/* Compact tip bar */}
+              <div className="flex items-center justify-between mb-3 pb-3 border-b border-outline-variant">
+                <div className="flex items-center gap-3">
+                  {[
+                    { icon: Camera, label: 'Side view' },
+                    { icon: Move, label: 'Full body' },
+                    { icon: Timer, label: '15–30 s' },
+                  ].map(({ icon: Icon, label }) => (
+                    <div key={label} className="flex items-center gap-1 font-mono text-[9px] text-on-surface-variant/70">
+                      <Icon className="w-3 h-3 text-primary/70 flex-shrink-0" />
+                      {label}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setShowTips(s => !s)}
+                  className="flex items-center gap-1 font-mono text-[9px] text-primary/60 hover:text-primary transition-colors"
+                  aria-label="Toggle recording tips"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                  Tips
+                  <ChevronDown className={cn('w-3 h-3 transition-transform duration-200', showTips && 'rotate-180')} />
+                </button>
+              </div>
+
+              {/* Expanded tips */}
+              <AnimatePresence>
+                {showTips && (
+                  <motion.div
+                    key="tips"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {[
+                        { icon: Camera, title: 'Side view', detail: 'Camera at hip height, perpendicular to your path' },
+                        { icon: Move,   title: 'Full body', detail: 'Hips to feet visible in frame at all times' },
+                        { icon: Timer,  title: '15–30 s',   detail: 'Needs 4+ heel-strike cycles per leg' },
+                      ].map(({ icon: Icon, title, detail }) => (
+                        <div key={title} className="bg-surface-container rounded-xl p-2.5 border border-outline-variant">
+                          <Icon className="w-3.5 h-3.5 text-primary mb-1.5" />
+                          <p className="font-mono text-[9px] font-bold text-on-surface uppercase tracking-widest mb-0.5">{title}</p>
+                          <p className="font-mono text-[8px] text-on-surface-variant/70 leading-tight">{detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="flex items-center justify-between mb-1">
                 <p className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">
                   {setupReady ? 'Camera Setup Validation' : 'Loading detection engine…'}

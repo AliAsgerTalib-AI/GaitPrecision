@@ -101,14 +101,77 @@ function cadenceLabel(cadence: number): { label: string; detail: string } {
   return { label: 'Brisk pace', detail: 'Excellent walking speed.' };
 }
 
-function fallRisk(asymmetry: number, cadence: number, score: number): { level: 'Low' | 'Moderate' | 'Elevated'; color: string; dot: string; advice: string } {
+type ScreeningTest = { name: string; how: string; flag: string };
+type FallRiskResult = {
+  level: 'Low' | 'Moderate' | 'Elevated';
+  color: string;
+  dot: string;
+  advice: string;
+  protocol: string[];
+  doctorPrompt: string | null;
+  screening: ScreeningTest[];
+};
+
+function fallRisk(asymmetry: number, cadence: number, score: number): FallRiskResult {
   if ((asymmetry > 20 || cadence < 70 || score < 50) && cadence > 0) {
-    return { level: 'Elevated', color: 'text-error', dot: 'bg-error', advice: 'Consider speaking with your doctor or physiotherapist about balance exercises.' };
+    return {
+      level: 'Elevated',
+      color: 'text-error',
+      dot: 'bg-error',
+      advice: 'Multiple gait indicators suggest a meaningful fall risk.',
+      protocol: [
+        'Avoid walking on uneven or unfamiliar terrain alone.',
+        'Secure loose rugs, improve hallway lighting, and clear walkways at home.',
+        'Begin gentle seated balance exercises (ankle pumps, seated marching) daily.',
+      ],
+      doctorPrompt: 'Book an appointment with your GP or physiotherapist. Ask about a formal balance assessment and falls-prevention programme.',
+      screening: [
+        {
+          name: 'Timed Up & Go (TUG)',
+          how: 'Sit in a standard chair. Stand up, walk 3 m, turn around, walk back, and sit down. Time the full sequence.',
+          flag: 'Over 12 seconds — share this result with your doctor at your next visit.',
+        },
+        {
+          name: '30-Second Chair Stand',
+          how: 'Sit with arms crossed on your chest. Count how many times you can rise to a full stand in 30 seconds without using your arms.',
+          flag: 'Under 12 reps (ages 60–69) or under 11 (ages 70+) — bring this to your next appointment.',
+        },
+      ],
+    };
   }
   if (asymmetry > 10 || (cadence > 0 && cadence < 90) || score < 70) {
-    return { level: 'Moderate', color: 'text-[#f59e0b]', dot: 'bg-[#f59e0b]', advice: 'Some imbalance detected. Balance and strength exercises can help.' };
+    return {
+      level: 'Moderate',
+      color: 'text-[#f59e0b]',
+      dot: 'bg-[#f59e0b]',
+      advice: 'Some gait imbalance detected. Targeted exercise can help.',
+      protocol: [
+        'Practice single-leg balance: hold for 10–30 s on each side, daily.',
+        'Try heel-to-toe walking along a straight line for 20 steps.',
+        'Check your footwear — well-fitted shoes with non-slip soles reduce fall risk.',
+      ],
+      doctorPrompt: 'Mention your gait findings at your next routine check-up, especially if you have noticed recent changes in your balance or any near-falls.',
+      screening: [
+        {
+          name: '30-Second Chair Stand',
+          how: 'Sit with arms crossed on your chest. Count how many times you can rise to a full stand in 30 seconds without using your arms.',
+          flag: 'Under 12 reps (ages 60–69) or under 11 (ages 70+) — mention this at your next check-up.',
+        },
+      ],
+    };
   }
-  return { level: 'Low', color: 'text-primary', dot: 'bg-primary', advice: 'Your walking pattern suggests a low fall risk. Keep it up!' };
+  return {
+    level: 'Low',
+    color: 'text-primary',
+    dot: 'bg-primary',
+    advice: 'Your walking pattern suggests a low fall risk. Keep it up!',
+    protocol: [
+      'Maintain your regular walking routine.',
+      'Add twice-weekly resistance training to support long-term joint and muscle health.',
+    ],
+    doctorPrompt: null,
+    screening: [],
+  };
 }
 
 export default function WellnessDashboard({ videoSrc, onRecord, onUpload }: WellnessDashboardProps) {
@@ -465,6 +528,22 @@ export default function WellnessDashboard({ videoSrc, onRecord, onUpload }: Well
                 Based on balance, cadence, and symmetry
               </div>
             )}
+            {hasData && risk.protocol.length > 0 && (
+              <ul className="mt-3 space-y-1.5">
+                {risk.protocol.map((step, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-on-surface-variant leading-relaxed">
+                    <span className={cn('mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0', risk.dot)} />
+                    {step}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {hasData && risk.doctorPrompt && (
+              <div className={cn('mt-4 rounded-xl p-3 flex items-start gap-2.5', risk.level === 'Elevated' ? 'bg-error/10 border border-error/20' : 'bg-[#f59e0b]/10 border border-[#f59e0b]/20')}>
+                <AlertTriangle className={cn('w-3.5 h-3.5 flex-shrink-0 mt-0.5', risk.level === 'Elevated' ? 'text-error' : 'text-[#f59e0b]')} />
+                <p className={cn('text-xs leading-relaxed', risk.level === 'Elevated' ? 'text-error/80' : 'text-[#f59e0b]/80')}>{risk.doctorPrompt}</p>
+              </div>
+            )}
           </motion.div>
         </aside>
       </div>
@@ -515,6 +594,25 @@ export default function WellnessDashboard({ videoSrc, onRecord, onUpload }: Well
                   <p className="text-xs text-on-surface-variant/40 mt-4 italic">This analysis is for informational purposes only and does not constitute medical advice.</p>
                 </div>
               </div>
+
+              {/* Screening Tests — shown for Moderate and Elevated risk */}
+              {risk.level !== 'Low' && risk.screening.length > 0 && (
+                <div className="px-6 py-5 border-t border-outline-variant/50">
+                  <p className="text-xs font-mono font-bold uppercase tracking-widest text-on-surface-variant/60 mb-3">Self-Assessment Tests You Can Try</p>
+                  <div className={cn('grid gap-4', risk.screening.length > 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 max-w-md')}>
+                    {risk.screening.map((test, i) => (
+                      <div key={i} className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/50">
+                        <p className="text-sm font-semibold text-on-surface mb-1.5">{test.name}</p>
+                        <p className="text-xs text-on-surface-variant leading-relaxed mb-3">{test.how}</p>
+                        <div className={cn('flex items-start gap-1.5', risk.level === 'Elevated' ? 'text-error/70' : 'text-[#f59e0b]/70')}>
+                          <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs leading-snug font-medium">{test.flag}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </motion.div>
           );
         })()}

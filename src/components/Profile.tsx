@@ -1,11 +1,12 @@
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  User, History, Settings, Save, Activity, CheckCircle2, Download, X, FileJson, Upload, Trash2,
+  User, History, Settings, Save, Activity, CheckCircle2, Download, X, FileJson, Upload, Trash2, Eye,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { getProfile, saveProfile, type UserProfile } from '@/src/lib/userProfile';
 import { loadSessions, clearAllSessions, deleteSession, type GaitSession } from '@/src/lib/sessionDb';
 import { fmtDate, fmtDuration, cn, mean } from '@/src/lib/utils';
+import { useAccessibility } from '@/src/contexts/AccessibilityContext';
 
 const EMPTY: UserProfile = { name: '', age: '', gender: '', heightCm: '', weightKg: '', notes: '' };
 
@@ -58,6 +59,7 @@ function downloadSessionReport(session: GaitSession, profile: UserProfile | null
 }
 
 export default function Profile() {
+  const { fontScale, setFontScale, highContrast, toggleHighContrast } = useAccessibility();
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [draft, setDraft]     = useState<UserProfile>(EMPTY);
@@ -327,6 +329,60 @@ export default function Profile() {
           <div className="bg-surface-container rounded-2xl border border-outline-variant p-5 text-center space-y-1">
             <p className="font-mono text-[9px] text-primary uppercase tracking-widest font-bold">On-Device Storage</p>
             <p className="text-xs text-on-surface-variant opacity-60">Profile is stored in your browser's local storage. No data leaves this device.</p>
+          </div>
+
+          {/* Accessibility panel */}
+          <div className="bg-surface-container rounded-2xl border border-outline-variant p-5 space-y-5">
+            <p className="font-mono text-[9px] text-primary uppercase tracking-widest font-bold flex items-center gap-2">
+              <Eye className="w-3.5 h-3.5" /> Display
+            </p>
+
+            {/* Font size */}
+            <div className="space-y-2">
+              <p className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest">Text size</p>
+              <div className="flex gap-2">
+                {(['normal', 'large', 'xl'] as const).map((scale, i) => (
+                  <button
+                    key={scale}
+                    onClick={() => setFontScale(scale)}
+                    aria-pressed={fontScale === scale}
+                    className={cn(
+                      'flex-1 py-2.5 rounded-lg border font-display font-bold transition-all',
+                      ['text-sm', 'text-base', 'text-lg'][i],
+                      fontScale === scale
+                        ? 'bg-primary text-on-primary border-primary'
+                        : 'bg-surface-container-high border-outline-variant text-on-surface-variant hover:border-primary/40'
+                    )}
+                  >
+                    A
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-on-surface-variant/60 font-sans">
+                {fontScale === 'normal' ? 'Standard' : fontScale === 'large' ? 'Large — easier to read' : 'Extra large'}
+              </p>
+            </div>
+
+            {/* High contrast */}
+            <div className="flex items-center justify-between pt-3 border-t border-outline-variant/40">
+              <div className="space-y-0.5">
+                <p className="font-mono text-[10px] text-on-surface uppercase tracking-widest font-bold">High contrast</p>
+                <p className="text-[10px] text-on-surface-variant/60 font-sans">Brighter text and borders</p>
+              </div>
+              <button
+                onClick={toggleHighContrast}
+                aria-pressed={highContrast}
+                className={cn(
+                  'w-12 h-6 rounded-full p-1 transition-colors relative',
+                  highContrast ? 'bg-primary' : 'bg-outline-variant'
+                )}
+              >
+                <div className={cn(
+                  'w-4 h-4 bg-surface rounded-full transition-transform shadow-sm',
+                  highContrast ? 'translate-x-6' : 'translate-x-0'
+                )} />
+              </button>
+            </div>
           </div>
         </aside>
 

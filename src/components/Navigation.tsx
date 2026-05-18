@@ -146,7 +146,7 @@ export default function Navigation({
               )}
             >
               <item.Icon className="w-5 h-5" />
-              <span className="font-mono text-[9px] uppercase tracking-wider font-bold">
+              <span className="font-mono text-[11px] uppercase tracking-wider font-bold">
                 {item.mobileLabel}
               </span>
             </button>

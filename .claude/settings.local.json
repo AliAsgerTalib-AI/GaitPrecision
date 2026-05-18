@@ -28,7 +28,9 @@
       "PowerShell(New-Item *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\alias\\\\OneDrive\\\\AI Projects\\\\GaitPrecision\\\\src\" -Recurse -File)",
       "Bash(Select-Object FullName)",
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\alias\\\\OneDrive\\\\AI Projects\\\\GaitPrecision\" -Directory)"
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\alias\\\\OneDrive\\\\AI Projects\\\\GaitPrecision\" -Directory)",
+      "Bash(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\alias\\\\OneDrive\\\\AI Projects\\\\GaitPrecision\" -Force | Select-Object Name, @{N='Type';E={if\\($_.PSIsContainer\\){'Dir'}else{'File'}}})"
     ]
   }
 }

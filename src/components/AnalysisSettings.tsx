@@ -48,9 +48,12 @@ export default function AnalysisSettings({ onApply, onReset, onOpenGlossary }: A
         {/* Detection Sensitivity */}
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest flex items-center gap-2 font-bold">
-              <Sliders className="w-3 h-3 text-primary" /> Stride Sensitivity
-            </label>
+            <div>
+              <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest flex items-center gap-2 font-bold">
+                <Sliders className="w-3 h-3 text-primary" /> Stride Sensitivity
+              </label>
+              <p className="font-sans text-[10px] text-on-surface-variant/60 mt-0.5">How precisely each step is detected</p>
+            </div>
             <span className="font-mono text-xs text-primary font-bold">{sensitivity}%</span>
           </div>
           <div className="relative pt-1">
@@ -60,7 +63,7 @@ export default function AnalysisSettings({ onApply, onReset, onOpenGlossary }: A
               max="100" 
               value={sensitivity} 
               onChange={(e) => setSensitivity(parseInt(e.target.value))}
-              className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary" 
+              className="w-full h-3 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary" 
             />
             <div className="flex justify-between mt-2 font-mono text-[8px] text-outline uppercase">
               <span>Coarse</span>
@@ -70,7 +73,7 @@ export default function AnalysisSettings({ onApply, onReset, onOpenGlossary }: A
           <div className="p-3 bg-surface-container-low rounded-lg border border-outline-variant flex gap-3">
             <Info className="w-4 h-4 text-on-surface-variant shrink-0" />
             <p className="text-[10px] text-on-surface-variant font-sans leading-relaxed italic">
-              Adjust if stride segmentation is failing in low-contrast environments or high-velocity captures.
+              Increase if steps are being missed; decrease if false steps are appearing.
             </p>
           </div>
         </div>
@@ -78,9 +81,12 @@ export default function AnalysisSettings({ onApply, onReset, onOpenGlossary }: A
         {/* Angle Thresholds */}
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest flex items-center gap-2 font-bold">
-              <Target className="w-3 h-3 text-secondary" /> Ankle Trigger (°)
-            </label>
+            <div>
+              <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest flex items-center gap-2 font-bold">
+                <Target className="w-3 h-3 text-secondary" /> Ankle Trigger (°)
+              </label>
+              <p className="font-sans text-[10px] text-on-surface-variant/60 mt-0.5">Foot angle that marks a heel strike</p>
+            </div>
             <span className="font-mono text-xs text-secondary font-bold">{ankleThreshold}°</span>
           </div>
           <div className="relative pt-1">
@@ -90,14 +96,17 @@ export default function AnalysisSettings({ onApply, onReset, onOpenGlossary }: A
               max="45" 
               value={ankleThreshold} 
               onChange={(e) => setAnkleThreshold(parseInt(e.target.value))}
-              className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-secondary" 
+              className="w-full h-3 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-secondary" 
             />
           </div>
 
           <div className="flex justify-between items-center">
-            <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest flex items-center gap-2 font-bold">
-              <Target className="w-3 h-3 text-primary" /> Knee Lockout (°)
-            </label>
+            <div>
+              <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest flex items-center gap-2 font-bold">
+                <Target className="w-3 h-3 text-primary" /> Knee Lockout (°)
+              </label>
+              <p className="font-sans text-[10px] text-on-surface-variant/60 mt-0.5">Angle at which the knee is considered fully straight</p>
+            </div>
             <span className="font-mono text-xs text-primary font-bold">{kneeThreshold}°</span>
           </div>
           <div className="relative pt-1">
@@ -107,7 +116,7 @@ export default function AnalysisSettings({ onApply, onReset, onOpenGlossary }: A
               max="180" 
               value={kneeThreshold} 
               onChange={(e) => setKneeThreshold(parseInt(e.target.value))}
-              className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary" 
+              className="w-full h-3 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary" 
             />
           </div>
         </div>

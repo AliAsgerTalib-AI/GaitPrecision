@@ -92,3 +92,37 @@
   background-size: 40px 40px;
 }
 
+/* ── Accessibility: Font Scale ─────────────────────────────────────── */
+[data-font-scale="large"] .text-\[8px\]  { font-size: 11px !important; }
+[data-font-scale="large"] .text-\[9px\]  { font-size: 12px !important; }
+[data-font-scale="large"] .text-\[10px\] { font-size: 13px !important; }
+[data-font-scale="large"] .text-\[11px\] { font-size: 14px !important; }
+[data-font-scale="large"] .text-xs       { font-size: 14px !important; line-height: 1.5 !important; }
+[data-font-scale="large"] .text-sm       { font-size: 16px !important; line-height: 1.6 !important; }
+
+[data-font-scale="xl"] .text-\[8px\]  { font-size: 14px !important; }
+[data-font-scale="xl"] .text-\[9px\]  { font-size: 15px !important; }
+[data-font-scale="xl"] .text-\[10px\] { font-size: 16px !important; }
+[data-font-scale="xl"] .text-\[11px\] { font-size: 17px !important; }
+[data-font-scale="xl"] .text-xs       { font-size: 17px !important; line-height: 1.5 !important; }
+[data-font-scale="xl"] .text-sm       { font-size: 19px !important; line-height: 1.6 !important; }
+
+/* ── Accessibility: High Contrast ──────────────────────────────────── */
+[data-high-contrast="true"] {
+  --color-on-surface: #ffffff;
+  --color-on-surface-variant: #d8e0f0;
+  --color-primary: #7fffee;
+  --color-outline: #b0bec5;
+  --color-outline-variant: #546e7a;
+  --color-surface-container: #172038;
+  --color-surface-container-high: #1e2d4a;
+  --color-surface-container-highest: #273555;
+  --color-surface-container-low: #111828;
+  --color-surface-container-lowest: #090f1c;
+}
+
+[data-high-contrast="true"] .glass-panel {
+  border-color: var(--color-outline-variant) !important;
+  border-width: 1.5px !important;
+}
+
