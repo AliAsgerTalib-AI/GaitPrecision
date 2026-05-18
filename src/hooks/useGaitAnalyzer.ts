@@ -4,25 +4,26 @@ import { MEDIAPIPE_WASM_PATH, MEDIAPIPE_MODEL_PATH } from '@/src/lib/mediapipe-c
 import type { StrideMetrics, LegStrideMetrics } from '@/src/lib/sessionDb';
 import { poseStore } from '@/src/lib/poseStore';
 
-const SYNC_EVERY = 6;           // flush ref → state every 6th detected frame
-const HISTORY_CAP = 50;         // max readings kept per side
-const EMA_ALPHA = 0.2;          // exponential moving-average weight (lower = smoother)
-const HEEL_STRIKE_ANGLE = 155;  // (°) knee above this while in swing → heel-strike
-const TOE_OFF_ANGLE = 140;      // (°) knee below this while in stance → toe-off
-const MAX_RECENT_STRIDES = 4;   // rolling window for cadence / phase % computation
-const VISIBILITY_THRESHOLD = 0.6; // min per-landmark confidence to include a reading
+const SYNC_EVERY = 6;              // flush ref → state every 6th detected frame
+const HISTORY_CAP = 50;            // max readings kept per side
+const EMA_ALPHA = 0.2;             // exponential moving-average weight (lower = smoother)
+const HEEL_STRIKE_BASELINE = 135;  // (°) minimum extension for a local-peak to qualify as heel-strike
+const TOE_OFF_ANGLE = 120;         // (°) knee below this while in stance → toe-off
+const PEAK_WINDOW = 5;             // frame window for local-maxima heel-strike detection
+const MAX_RECENT_STRIDES = 4;      // rolling window for cadence / phase % computation
+const VISIBILITY_THRESHOLD = 0.6;  // min per-landmark confidence to include a reading
 const VISIBILITY_WARN_FRAMES = 20; // consecutive dropped frames before showing the leg-visibility warning
 
 export interface GaitConfig {
   sensitivity: number;    // 0–100 → EMA alpha 0.05–0.45
-  kneeThreshold: number;  // °, heel-strike gate (HEEL_STRIKE_ANGLE)
+  kneeThreshold: number;  // °, minimum extension baseline for heel-strike peak detection
   ankleThreshold: number; // °, min deviation from 90° neutral to log ankle reading
   autoScale: boolean;     // scale skeleton to fill 80% of canvas each frame
 }
 
 export const DEFAULT_CONFIG: GaitConfig = {
   sensitivity: 50,
-  kneeThreshold: HEEL_STRIKE_ANGLE,
+  kneeThreshold: HEEL_STRIKE_BASELINE,
   ankleThreshold: 15,
   autoScale: true,
 };
@@ -46,6 +47,7 @@ interface LegGaitState {
   lastToeOff: number;      // video currentTime (s), −1 = not yet detected
   stanceTimes: number[];   // rolling window of recent stance durations
   strideTimes: number[];   // rolling window of recent stride durations
+  angleHistory: number[];  // PEAK_WINDOW-length buffer for local-maxima detection
 }
 
 // Scales normalized landmarks so the subject fills ~80% of the canvas each frame.
@@ -66,25 +68,47 @@ function scaleLandmarksToFit(lm: NormalizedLandmark[]): NormalizedLandmark[] {
   return lm.map(p => ({ ...p, x: 0.5 + (p.x - cx) * scale, y: 0.5 + (p.y - cy) * scale }));
 }
 
-function detectStrideEvent(state: LegGaitState, kneeAngle: number, t: number, heelStrikeAngle: number, toeOffAngle: number): void {
+function detectStrideEvent(state: LegGaitState, kneeAngle: number, t: number, heelStrikeBaseline: number, toeOffAngle: number): void {
+  // Toe-off: knee flexes past the threshold while in stance → enter swing phase.
   if (state.phase === 'stance' && kneeAngle < toeOffAngle) {
     state.lastToeOff = t;
     state.phase = 'swing';
-  } else if (state.phase === 'swing' && kneeAngle > heelStrikeAngle) {
-    if (state.lastHeelStrike >= 0) {
-      const strideTime = t - state.lastHeelStrike;
-      if (strideTime > 0.4 && strideTime < 3.0) { // physiological plausibility guard
-        state.strideTimes.push(strideTime);
-        if (state.strideTimes.length > MAX_RECENT_STRIDES) state.strideTimes.shift();
-        if (state.lastToeOff > state.lastHeelStrike) {
-          const stanceTime = state.lastToeOff - state.lastHeelStrike;
-          state.stanceTimes.push(stanceTime);
-          if (state.stanceTimes.length > MAX_RECENT_STRIDES) state.stanceTimes.shift();
+    state.angleHistory = [];
+    return;
+  }
+
+  // Heel-strike via local-maxima peak detection during swing.
+  // Accumulate a short angle history and wait for the centre element to be
+  // a local maximum above the extension baseline — this captures the natural
+  // peak extension inflection point rather than a fixed threshold crossing.
+  if (state.phase === 'swing') {
+    state.angleHistory.push(kneeAngle);
+    if (state.angleHistory.length > PEAK_WINDOW) state.angleHistory.shift();
+
+    if (state.angleHistory.length === PEAK_WINDOW) {
+      const midIdx = Math.floor(PEAK_WINDOW / 2);
+      const midAngle = state.angleHistory[midIdx];
+
+      const isLocalMax = state.angleHistory.every((a, i) => i === midIdx || a <= midAngle);
+
+      if (isLocalMax && midAngle > heelStrikeBaseline) {
+        if (state.lastHeelStrike >= 0) {
+          const strideTime = t - state.lastHeelStrike;
+          if (strideTime > 0.4 && strideTime < 3.0) { // physiological plausibility guard
+            state.strideTimes.push(strideTime);
+            if (state.strideTimes.length > MAX_RECENT_STRIDES) state.strideTimes.shift();
+            if (state.lastToeOff > state.lastHeelStrike) {
+              const stanceTime = state.lastToeOff - state.lastHeelStrike;
+              state.stanceTimes.push(stanceTime);
+              if (state.stanceTimes.length > MAX_RECENT_STRIDES) state.stanceTimes.shift();
+            }
+          }
         }
+        state.lastHeelStrike = t;
+        state.phase = 'stance';
+        state.angleHistory = [];
       }
     }
-    state.lastHeelStrike = t;
-    state.phase = 'stance';
   }
 }
 
@@ -104,7 +128,7 @@ function computeLegMetrics(state: LegGaitState): LegStrideMetrics {
 }
 
 function freshGaitState(): { left: LegGaitState; right: LegGaitState } {
-  const leg = (): LegGaitState => ({ phase: 'stance', lastHeelStrike: -1, lastToeOff: -1, stanceTimes: [], strideTimes: [] });
+  const leg = (): LegGaitState => ({ phase: 'stance', lastHeelStrike: -1, lastToeOff: -1, stanceTimes: [], strideTimes: [], angleHistory: [] });
   return { left: leg(), right: leg() };
 }
 
@@ -161,7 +185,7 @@ export function useGaitAnalyzer() {
 
   // Live-configurable parameters — written by applyConfig, read inside the rAF loop.
   const emaAlphaRef        = useRef(EMA_ALPHA);
-  const heelStrikeRef      = useRef(HEEL_STRIKE_ANGLE);
+  const heelStrikeRef      = useRef(HEEL_STRIKE_BASELINE);
   const toeOffRef          = useRef(TOE_OFF_ANGLE);
   const ankleDeviationRef  = useRef(DEFAULT_CONFIG.ankleThreshold);
   const autoScaleRef       = useRef(DEFAULT_CONFIG.autoScale);
@@ -451,7 +475,7 @@ export function useGaitAnalyzer() {
 
   const resetConfig = useCallback(() => {
     emaAlphaRef.current       = EMA_ALPHA;
-    heelStrikeRef.current     = HEEL_STRIKE_ANGLE;
+    heelStrikeRef.current     = HEEL_STRIKE_BASELINE;
     toeOffRef.current         = TOE_OFF_ANGLE;
     ankleDeviationRef.current = DEFAULT_CONFIG.ankleThreshold;
     autoScaleRef.current      = DEFAULT_CONFIG.autoScale;
